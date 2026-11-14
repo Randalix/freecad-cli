@@ -1,0 +1,2217 @@
+{
+ "source": "(letzter Lauf)",
+ "scene": {
+  "source": "(letzter Lauf)",
+  "triangles": 1224,
+  "parts": 29,
+  "bbox": [
+   0.0,
+   0.0,
+   0.0,
+   2400.0,
+   230.0,
+   770.0
+  ],
+  "volume": 76096234.4,
+  "part_list": [
+   {
+    "id": 0,
+    "item": 0,
+    "tris": 60,
+    "bbox": [
+     15.0,
+     15.0,
+     0.0,
+     423.0,
+     33.0,
+     723.0
+    ],
+    "name": "Vorderwand_links"
+   },
+   {
+    "id": 1,
+    "item": 1,
+    "tris": 52,
+    "bbox": [
+     1977.0,
+     15.0,
+     0.0,
+     2385.0,
+     33.0,
+     723.0
+    ],
+    "name": "Vorderwand_rechts"
+   },
+   {
+    "id": 2,
+    "item": 2,
+    "tris": 232,
+    "bbox": [
+     15.0,
+     177.0,
+     0.0,
+     2385.0,
+     195.0,
+     723.0
+    ],
+    "name": "Rueckwand"
+   },
+   {
+    "id": 3,
+    "item": 3,
+    "tris": 12,
+    "bbox": [
+     15.0,
+     33.0,
+     0.0,
+     423.0,
+     177.0,
+     18.0
+    ],
+    "name": "Boden_links"
+   },
+   {
+    "id": 4,
+    "item": 4,
+    "tris": 12,
+    "bbox": [
+     1977.0,
+     33.0,
+     0.0,
+     2385.0,
+     177.0,
+     18.0
+    ],
+    "name": "Boden_rechts"
+   },
+   {
+    "id": 5,
+    "item": 5,
+    "tris": 12,
+    "bbox": [
+     15.0,
+     33.0,
+     705.0,
+     423.0,
+     177.0,
+     723.0
+    ],
+    "name": "Deckel_links"
+   },
+   {
+    "id": 6,
+    "item": 6,
+    "tris": 28,
+    "bbox": [
+     1977.0,
+     33.0,
+     705.0,
+     2385.0,
+     177.0,
+     723.0
+    ],
+    "name": "Deckel_rechts"
+   },
+   {
+    "id": 7,
+    "item": 7,
+    "tris": 12,
+    "bbox": [
+     405.0,
+     33.0,
+     18.0,
+     423.0,
+     177.0,
+     705.0
+    ],
+    "name": "Endwand_links"
+   },
+   {
+    "id": 8,
+    "item": 8,
+    "tris": 12,
+    "bbox": [
+     1977.0,
+     33.0,
+     18.0,
+     1995.0,
+     177.0,
+     705.0
+    ],
+    "name": "Endwand_rechts"
+   },
+   {
+    "id": 9,
+    "item": 9,
+    "tris": 12,
+    "bbox": [
+     15.0,
+     27.0,
+     180.75,
+     405.0,
+     183.0,
+     192.75
+    ],
+    "name": "Fachboden_L1"
+   },
+   {
+    "id": 10,
+    "item": 10,
+    "tris": 12,
+    "bbox": [
+     15.0,
+     27.0,
+     355.5,
+     405.0,
+     183.0,
+     367.5
+    ],
+    "name": "Fachboden_L2"
+   },
+   {
+    "id": 11,
+    "item": 11,
+    "tris": 12,
+    "bbox": [
+     15.0,
+     27.0,
+     530.25,
+     405.0,
+     183.0,
+     542.25
+    ],
+    "name": "Fachboden_L3"
+   },
+   {
+    "id": 12,
+    "item": 12,
+    "tris": 28,
+    "bbox": [
+     1995.0,
+     27.0,
+     218.0,
+     2385.0,
+     183.0,
+     230.0
+    ],
+    "name": "Fachboden_R1"
+   },
+   {
+    "id": 13,
+    "item": 13,
+    "tris": 28,
+    "bbox": [
+     1995.0,
+     27.0,
+     510.0,
+     2385.0,
+     183.0,
+     522.0
+    ],
+    "name": "Fachboden_R2"
+   },
+   {
+    "id": 14,
+    "item": 14,
+    "tris": 36,
+    "bbox": [
+     1995.0,
+     73.0,
+     230.0,
+     2385.0,
+     85.0,
+     510.0
+    ],
+    "name": "Laptopfach_Trennwand"
+   },
+   {
+    "id": 15,
+    "item": 15,
+    "tris": 12,
+    "bbox": [
+     423.0,
+     15.0,
+     623.0,
+     1977.0,
+     33.0,
+     723.0
+    ],
+    "name": "Zarge_vorn"
+   },
+   {
+    "id": 16,
+    "item": 16,
+    "tris": 12,
+    "bbox": [
+     1191.0,
+     33.0,
+     0.0,
+     1209.0,
+     177.0,
+     723.0
+    ],
+    "name": "Mittelstuetze"
+   },
+   {
+    "id": 17,
+    "item": 17,
+    "tris": 236,
+    "bbox": [
+     0.0,
+     0.0,
+     723.0,
+     2400.0,
+     220.0,
+     750.0
+    ],
+    "name": "Eichenplatte"
+   },
+   {
+    "id": 18,
+    "item": 18,
+    "tris": 12,
+    "bbox": [
+     2210.0,
+     228.0,
+     210.0,
+     2290.0,
+     230.0,
+     290.0
+    ],
+    "name": "Wand_Steckdose_Platzhalter"
+   },
+   {
+    "id": 19,
+    "item": 19,
+    "tris": 12,
+    "bbox": [
+     2225.0,
+     200.0,
+     220.0,
+     2275.0,
+     228.0,
+     280.0
+    ],
+    "name": "Winkelstecker_Platzhalter"
+   },
+   {
+    "id": 20,
+    "item": 20,
+    "tris": 12,
+    "bbox": [
+     2070.0,
+     80.0,
+     18.0,
+     2370.0,
+     130.0,
+     53.0
+    ],
+    "name": "Steckdosenleiste_Platzhalter"
+   },
+   {
+    "id": 21,
+    "item": 21,
+    "tris": 12,
+    "bbox": [
+     2225.0,
+     145.0,
+     18.0,
+     2275.0,
+     160.0,
+     30.0
+    ],
+    "name": "Zugentlastung_Leiste"
+   },
+   {
+    "id": 22,
+    "item": 22,
+    "tris": 12,
+    "bbox": [
+     2070.0,
+     90.0,
+     230.0,
+     2180.0,
+     150.0,
+     260.0
+    ],
+    "name": "Netzteil_Platzhalter"
+   },
+   {
+    "id": 23,
+    "item": 23,
+    "tris": 12,
+    "bbox": [
+     2005.0,
+     42.0,
+     230.0,
+     2365.0,
+     64.0,
+     480.0
+    ],
+    "name": "Laptop"
+   },
+   {
+    "id": 24,
+    "item": 24,
+    "tris": 24,
+    "bbox": [
+     2246.0,
+     143.0,
+     32.0,
+     2254.0,
+     209.0,
+     220.0
+    ],
+    "name": "Kabelweg_Netzleitung"
+   },
+   {
+    "id": 25,
+    "item": 25,
+    "tris": 12,
+    "bbox": [
+     2106.0,
+     64.0,
+     240.0,
+     2114.0,
+     90.0,
+     248.0
+    ],
+    "name": "Kabelweg_USBC_Laptop"
+   },
+   {
+    "id": 26,
+    "item": 26,
+    "tris": 72,
+    "bbox": [
+     2011.0,
+     101.0,
+     53.0,
+     2104.0,
+     171.0,
+     248.0
+    ],
+    "name": "Kabelweg_AC_Netzteil"
+   },
+   {
+    "id": 27,
+    "item": 27,
+    "tris": 12,
+    "bbox": [
+     1995.5,
+     157.5,
+     20.0,
+     2034.5,
+     176.5,
+     725.0
+    ],
+    "name": "Kabelweg_Schacht"
+   },
+   {
+    "id": 28,
+    "item": 28,
+    "tris": 212,
+    "bbox": [
+     1986.0,
+     131.049,
+     723.0,
+     2044.0,
+     188.951,
+     770.0
+    ],
+    "name": "Kabelweg_Plattendurchlass"
+   }
+  ],
+  "build_seconds": 0.44
+ },
+ "min_wall": 0.8,
+ "hotspots": [
+  {
+   "kind": "offenes_netz",
+   "severity": "hoch",
+   "reason": "nicht-mannigfaltige Kanten (1, zusammen 8.0 mm): Netz nicht geschlossen/mannigfaltig",
+   "value": 1,
+   "box": [
+    2246.0,
+    209.0,
+    32.0,
+    2254.0,
+    209.0,
+    32.0
+   ],
+   "center": [
+    2250.0,
+    209.0,
+    32.0
+   ],
+   "parts": [
+    24
+   ],
+   "view": [
+    270.0,
+    -45.0
+   ],
+   "mode": "shaded",
+   "n": 1,
+   "part_names": [
+    "Kabelweg_Netzleitung"
+   ]
+  },
+  {
+   "kind": "offenes_netz",
+   "severity": "hoch",
+   "reason": "nicht-mannigfaltige Kanten (1, zusammen 8.0 mm): Netz nicht geschlossen/mannigfaltig",
+   "value": 1,
+   "box": [
+    2011.0,
+    138.0,
+    240.0,
+    2011.0,
+    138.0,
+    248.0
+   ],
+   "center": [
+    2011.0,
+    138.0,
+    244.0
+   ],
+   "parts": [
+    26
+   ],
+   "view": [
+    315.0,
+    -35.3
+   ],
+   "mode": "shaded",
+   "n": 2,
+   "part_names": [
+    "Kabelweg_AC_Netzteil"
+   ]
+  },
+  {
+   "kind": "offenes_netz",
+   "severity": "hoch",
+   "reason": "nicht-mannigfaltige Kanten (1, zusammen 8.0 mm): Netz nicht geschlossen/mannigfaltig",
+   "value": 1,
+   "box": [
+    2011.0,
+    171.0,
+    248.0,
+    2019.0,
+    171.0,
+    248.0
+   ],
+   "center": [
+    2015.0,
+    171.0,
+    248.0
+   ],
+   "parts": [
+    26
+   ],
+   "view": [
+    180.0,
+    45.0
+   ],
+   "mode": "shaded",
+   "n": 3,
+   "part_names": [
+    "Kabelweg_AC_Netzteil"
+   ]
+  },
+  {
+   "kind": "offenes_netz",
+   "severity": "hoch",
+   "reason": "nicht-mannigfaltige Kanten (1, zusammen 8.0 mm): Netz nicht geschlossen/mannigfaltig",
+   "value": 1,
+   "box": [
+    2011.0,
+    163.0,
+    58.0,
+    2011.0,
+    171.0,
+    58.0
+   ],
+   "center": [
+    2011.0,
+    167.0,
+    58.0
+   ],
+   "parts": [
+    26
+   ],
+   "view": [
+    296.6,
+    -41.8
+   ],
+   "mode": "shaded",
+   "n": 4,
+   "part_names": [
+    "Kabelweg_AC_Netzteil"
+   ]
+  },
+  {
+   "kind": "offenes_netz",
+   "severity": "hoch",
+   "reason": "nicht-mannigfaltige Kanten (1, zusammen 8.0 mm): Netz nicht geschlossen/mannigfaltig",
+   "value": 1,
+   "box": [
+    2104.0,
+    171.0,
+    58.0,
+    2104.0,
+    171.0,
+    66.0
+   ],
+   "center": [
+    2104.0,
+    171.0,
+    62.0
+   ],
+   "parts": [
+    26
+   ],
+   "view": [
+    180.0,
+    36.9
+   ],
+   "mode": "shaded",
+   "n": 5,
+   "part_names": [
+    "Kabelweg_AC_Netzteil"
+   ]
+  },
+  {
+   "kind": "offenes_netz",
+   "severity": "hoch",
+   "reason": "nicht-mannigfaltige Kanten (1, zusammen 8.0 mm): Netz nicht geschlossen/mannigfaltig",
+   "value": 1,
+   "box": [
+    2096.0,
+    101.0,
+    66.0,
+    2104.0,
+    101.0,
+    66.0
+   ],
+   "center": [
+    2100.0,
+    101.0,
+    66.0
+   ],
+   "parts": [
+    26
+   ],
+   "view": [
+    90.0,
+    0.0
+   ],
+   "mode": "shaded",
+   "n": 6,
+   "part_names": [
+    "Kabelweg_AC_Netzteil"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "hoch",
+   "reason": "Br\u00fccke 220 mm Spannweite (> 10 mm), waagerechte Unterseite 525179 mm\u00b2 bei z=723.0",
+   "value": 220.0,
+   "area": 525178.7,
+   "box": [
+    0.0,
+    0.0,
+    723.0,
+    2400.0,
+    220.0,
+    723.0
+   ],
+   "center": [
+    1758.761,
+    145.268,
+    723.0
+   ],
+   "parts": [
+    17
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 7,
+   "part_names": [
+    "Eichenplatte"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "hoch",
+   "reason": "Br\u00fccke 156 mm Spannweite (> 10 mm), waagerechte Unterseite 60840 mm\u00b2 bei z=180.8",
+   "value": 156.0,
+   "area": 60840.0,
+   "box": [
+    15.0,
+    27.0,
+    180.75,
+    405.0,
+    183.0,
+    180.75
+   ],
+   "center": [
+    210.0,
+    105.0,
+    180.75
+   ],
+   "parts": [
+    9
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 8,
+   "part_names": [
+    "Fachboden_L1"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "hoch",
+   "reason": "Br\u00fccke 156 mm Spannweite (> 10 mm), waagerechte Unterseite 60840 mm\u00b2 bei z=355.5",
+   "value": 156.0,
+   "area": 60840.0,
+   "box": [
+    15.0,
+    27.0,
+    355.5,
+    405.0,
+    183.0,
+    355.5
+   ],
+   "center": [
+    210.0,
+    105.0,
+    355.5
+   ],
+   "parts": [
+    10
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 9,
+   "part_names": [
+    "Fachboden_L2"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "hoch",
+   "reason": "Br\u00fccke 156 mm Spannweite (> 10 mm), waagerechte Unterseite 60840 mm\u00b2 bei z=530.2",
+   "value": 156.0,
+   "area": 60840.0,
+   "box": [
+    15.0,
+    27.0,
+    530.25,
+    405.0,
+    183.0,
+    530.25
+   ],
+   "center": [
+    210.0,
+    105.0,
+    530.25
+   ],
+   "parts": [
+    11
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 10,
+   "part_names": [
+    "Fachboden_L3"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "hoch",
+   "reason": "Br\u00fccke 156 mm Spannweite (> 10 mm), waagerechte Unterseite 60040 mm\u00b2 bei z=218.0",
+   "value": 156.0,
+   "area": 60040.0,
+   "box": [
+    1995.0,
+    27.0,
+    218.0,
+    2385.0,
+    183.0,
+    218.0
+   ],
+   "center": [
+    2118.889,
+    139.778,
+    218.0
+   ],
+   "parts": [
+    12
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 11,
+   "part_names": [
+    "Fachboden_R1"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "hoch",
+   "reason": "Br\u00fccke 156 mm Spannweite (> 10 mm), waagerechte Unterseite 60040 mm\u00b2 bei z=510.0",
+   "value": 156.0,
+   "area": 60040.0,
+   "box": [
+    1995.0,
+    27.0,
+    510.0,
+    2385.0,
+    183.0,
+    510.0
+   ],
+   "center": [
+    2118.889,
+    139.778,
+    510.0
+   ],
+   "parts": [
+    13
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 12,
+   "part_names": [
+    "Fachboden_R2"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "hoch",
+   "reason": "Br\u00fccke 144 mm Spannweite (> 10 mm), waagerechte Unterseite 58752 mm\u00b2 bei z=705.0",
+   "value": 144.0,
+   "area": 58752.0,
+   "box": [
+    15.0,
+    33.0,
+    705.0,
+    423.0,
+    177.0,
+    705.0
+   ],
+   "center": [
+    219.0,
+    105.0,
+    705.0
+   ],
+   "parts": [
+    5
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 13,
+   "part_names": [
+    "Deckel_links"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "hoch",
+   "reason": "Br\u00fccke 144 mm Spannweite (> 10 mm), waagerechte Unterseite 57952 mm\u00b2 bei z=705.0",
+   "value": 144.0,
+   "area": 57952.0,
+   "box": [
+    1977.0,
+    33.0,
+    705.0,
+    2385.0,
+    177.0,
+    705.0
+   ],
+   "center": [
+    2087.778,
+    129.222,
+    705.0
+   ],
+   "parts": [
+    6
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 14,
+   "part_names": [
+    "Deckel_rechts"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "hoch",
+   "reason": "Br\u00fccke 50 mm Spannweite (> 10 mm), waagerechte Unterseite 15000 mm\u00b2 bei z=18.0",
+   "value": 49.92,
+   "area": 15000.0,
+   "box": [
+    2070.0,
+    80.0,
+    18.0,
+    2370.0,
+    130.0,
+    18.0
+   ],
+   "center": [
+    2220.0,
+    105.0,
+    18.0
+   ],
+   "parts": [
+    20
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 15,
+   "part_names": [
+    "Steckdosenleiste_Platzhalter"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "hoch",
+   "reason": "Br\u00fccke 60 mm Spannweite (> 10 mm), waagerechte Unterseite 6600 mm\u00b2 bei z=230.0",
+   "value": 59.76,
+   "area": 6600.0,
+   "box": [
+    2070.0,
+    90.0,
+    230.0,
+    2180.0,
+    150.0,
+    230.0
+   ],
+   "center": [
+    2125.0,
+    120.0,
+    230.0
+   ],
+   "parts": [
+    22
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 16,
+   "part_names": [
+    "Netzteil_Platzhalter"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "hoch",
+   "reason": "Br\u00fccke 58 mm Spannweite (> 10 mm), waagerechte Unterseite 2636 mm\u00b2 bei z=723.0",
+   "value": 57.9,
+   "area": 2636.1,
+   "box": [
+    1986.0,
+    131.049,
+    723.0,
+    2044.0,
+    188.951,
+    723.0
+   ],
+   "center": [
+    2014.073,
+    159.519,
+    723.0
+   ],
+   "parts": [
+    28
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 17,
+   "part_names": [
+    "Kabelweg_Plattendurchlass"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "hoch",
+   "reason": "Br\u00fccke 28 mm Spannweite (> 10 mm), waagerechte Unterseite 1400 mm\u00b2 bei z=220.0",
+   "value": 27.76,
+   "area": 1400.0,
+   "box": [
+    2225.0,
+    200.0,
+    220.0,
+    2275.0,
+    228.0,
+    220.0
+   ],
+   "center": [
+    2250.0,
+    214.0,
+    220.0
+   ],
+   "parts": [
+    19
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 18,
+   "part_names": [
+    "Winkelstecker_Platzhalter"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "mittel",
+   "reason": "Br\u00fccke 18 mm Spannweite (> 10 mm), waagerechte Unterseite 27972 mm\u00b2 bei z=623.0",
+   "value": 18.0,
+   "area": 27972.0,
+   "box": [
+    423.0,
+    15.0,
+    623.0,
+    1977.0,
+    33.0,
+    623.0
+   ],
+   "center": [
+    1200.0,
+    24.0,
+    623.0
+   ],
+   "parts": [
+    15
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 19,
+   "part_names": [
+    "Zarge_vorn"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "mittel",
+   "reason": "Br\u00fccke 22 mm Spannweite (> 10 mm), waagerechte Unterseite 7920 mm\u00b2 bei z=230.0",
+   "value": 22.0,
+   "area": 7920.0,
+   "box": [
+    2005.0,
+    42.0,
+    230.0,
+    2365.0,
+    64.0,
+    230.0
+   ],
+   "center": [
+    2185.0,
+    53.0,
+    230.0
+   ],
+   "parts": [
+    23
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 20,
+   "part_names": [
+    "Laptop"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "mittel",
+   "reason": "Br\u00fccke 12 mm Spannweite (> 10 mm), waagerechte Unterseite 4648 mm\u00b2 bei z=230.0",
+   "value": 12.0,
+   "area": 4648.0,
+   "box": [
+    1995.0,
+    73.0,
+    230.0,
+    2385.0,
+    85.0,
+    230.0
+   ],
+   "center": [
+    2252.333,
+    79.221,
+    230.0
+   ],
+   "parts": [
+    14
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 21,
+   "part_names": [
+    "Laptopfach_Trennwand"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "mittel",
+   "reason": "Br\u00fccke 18 mm Spannweite (> 10 mm), waagerechte Unterseite 2592 mm\u00b2 bei z=18.0",
+   "value": 17.94,
+   "area": 2592.0,
+   "box": [
+    405.0,
+    33.0,
+    18.0,
+    423.0,
+    177.0,
+    18.0
+   ],
+   "center": [
+    414.0,
+    105.0,
+    18.0
+   ],
+   "parts": [
+    7
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 22,
+   "part_names": [
+    "Endwand_links"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "mittel",
+   "reason": "Br\u00fccke 18 mm Spannweite (> 10 mm), waagerechte Unterseite 2592 mm\u00b2 bei z=18.0",
+   "value": 17.94,
+   "area": 2592.0,
+   "box": [
+    1977.0,
+    33.0,
+    18.0,
+    1995.0,
+    177.0,
+    18.0
+   ],
+   "center": [
+    1986.0,
+    105.0,
+    18.0
+   ],
+   "parts": [
+    8
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 23,
+   "part_names": [
+    "Endwand_rechts"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "mittel",
+   "reason": "Br\u00fccke 12 mm Spannweite (> 10 mm), waagerechte Unterseite 2280 mm\u00b2 bei z=256.0",
+   "value": 11.97,
+   "area": 2280.0,
+   "box": [
+    2010.0,
+    73.0,
+    256.0,
+    2200.0,
+    85.0,
+    256.0
+   ],
+   "center": [
+    2105.0,
+    79.0,
+    256.0
+   ],
+   "parts": [
+    14
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 24,
+   "part_names": [
+    "Laptopfach_Trennwand"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "mittel",
+   "reason": "Br\u00fccke 18 mm Spannweite (> 10 mm), waagerechte Unterseite 1080 mm\u00b2 bei z=88.0",
+   "value": 18.0,
+   "area": 1080.0,
+   "box": [
+    2220.0,
+    177.0,
+    88.0,
+    2280.0,
+    195.0,
+    88.0
+   ],
+   "center": [
+    2250.0,
+    186.0,
+    88.0
+   ],
+   "parts": [
+    2
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 25,
+   "part_names": [
+    "Rueckwand"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "mittel",
+   "reason": "Br\u00fccke 15 mm Spannweite (> 10 mm), waagerechte Unterseite 750 mm\u00b2 bei z=18.0",
+   "value": 14.86,
+   "area": 750.0,
+   "box": [
+    2225.0,
+    145.0,
+    18.0,
+    2275.0,
+    160.0,
+    18.0
+   ],
+   "center": [
+    2250.0,
+    152.5,
+    18.0
+   ],
+   "parts": [
+    21
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 26,
+   "part_names": [
+    "Zugentlastung_Leiste"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "mittel",
+   "reason": "Br\u00fccke 19 mm Spannweite (> 10 mm), waagerechte Unterseite 741 mm\u00b2 bei z=20.0",
+   "value": 18.78,
+   "area": 741.0,
+   "box": [
+    1995.5,
+    157.5,
+    20.0,
+    2034.5,
+    176.5,
+    20.0
+   ],
+   "center": [
+    2015.0,
+    167.0,
+    20.0
+   ],
+   "parts": [
+    27
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 27,
+   "part_names": [
+    "Kabelweg_Schacht"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 6 mm (\u2264 10 mm, unkritisch), 2346 mm\u00b2 bei z=192.8",
+   "value": 6.0,
+   "area": 2346.0,
+   "box": [
+    15.0,
+    27.0,
+    192.75,
+    406.0,
+    33.0,
+    192.75
+   ],
+   "center": [
+    210.5,
+    30.0,
+    192.75
+   ],
+   "parts": [
+    0
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 28,
+   "part_names": [
+    "Vorderwand_links"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 6 mm (\u2264 10 mm, unkritisch), 2346 mm\u00b2 bei z=367.5",
+   "value": 6.0,
+   "area": 2346.0,
+   "box": [
+    15.0,
+    27.0,
+    367.5,
+    406.0,
+    33.0,
+    367.5
+   ],
+   "center": [
+    210.5,
+    30.0,
+    367.5
+   ],
+   "parts": [
+    0
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 29,
+   "part_names": [
+    "Vorderwand_links"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 6 mm (\u2264 10 mm, unkritisch), 2346 mm\u00b2 bei z=542.2",
+   "value": 6.0,
+   "area": 2346.0,
+   "box": [
+    15.0,
+    27.0,
+    542.25,
+    406.0,
+    33.0,
+    542.25
+   ],
+   "center": [
+    210.5,
+    30.0,
+    542.25
+   ],
+   "parts": [
+    0
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 30,
+   "part_names": [
+    "Vorderwand_links"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 6 mm (\u2264 10 mm, unkritisch), 2346 mm\u00b2 bei z=522.0",
+   "value": 6.0,
+   "area": 2346.0,
+   "box": [
+    1994.0,
+    27.0,
+    522.0,
+    2385.0,
+    33.0,
+    522.0
+   ],
+   "center": [
+    2189.5,
+    30.0,
+    522.0
+   ],
+   "parts": [
+    1
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 31,
+   "part_names": [
+    "Vorderwand_rechts"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 6 mm (\u2264 10 mm, unkritisch), 2346 mm\u00b2 bei z=192.8",
+   "value": 6.0,
+   "area": 2346.0,
+   "box": [
+    15.0,
+    177.0,
+    192.75,
+    406.0,
+    183.0,
+    192.75
+   ],
+   "center": [
+    210.5,
+    180.0,
+    192.75
+   ],
+   "parts": [
+    2
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 32,
+   "part_names": [
+    "Rueckwand"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 6 mm (\u2264 10 mm, unkritisch), 2346 mm\u00b2 bei z=367.5",
+   "value": 6.0,
+   "area": 2346.0,
+   "box": [
+    15.0,
+    177.0,
+    367.5,
+    406.0,
+    183.0,
+    367.5
+   ],
+   "center": [
+    210.5,
+    180.0,
+    367.5
+   ],
+   "parts": [
+    2
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 33,
+   "part_names": [
+    "Rueckwand"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 6 mm (\u2264 10 mm, unkritisch), 2346 mm\u00b2 bei z=542.2",
+   "value": 6.0,
+   "area": 2346.0,
+   "box": [
+    15.0,
+    177.0,
+    542.25,
+    406.0,
+    183.0,
+    542.25
+   ],
+   "center": [
+    210.5,
+    180.0,
+    542.25
+   ],
+   "parts": [
+    2
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 34,
+   "part_names": [
+    "Rueckwand"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 6 mm (\u2264 10 mm, unkritisch), 2346 mm\u00b2 bei z=230.0",
+   "value": 6.0,
+   "area": 2346.0,
+   "box": [
+    1994.0,
+    177.0,
+    230.0,
+    2385.0,
+    183.0,
+    230.0
+   ],
+   "center": [
+    2189.5,
+    180.0,
+    230.0
+   ],
+   "parts": [
+    2
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 35,
+   "part_names": [
+    "Rueckwand"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 6 mm (\u2264 10 mm, unkritisch), 2346 mm\u00b2 bei z=522.0",
+   "value": 6.0,
+   "area": 2346.0,
+   "box": [
+    1994.0,
+    177.0,
+    522.0,
+    2385.0,
+    183.0,
+    522.0
+   ],
+   "center": [
+    2189.5,
+    180.0,
+    522.0
+   ],
+   "parts": [
+    2
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 36,
+   "part_names": [
+    "Rueckwand"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 6 mm (\u2264 10 mm, unkritisch), 2316 mm\u00b2 bei z=230.0",
+   "value": 6.0,
+   "area": 2316.0,
+   "box": [
+    1994.0,
+    27.0,
+    230.0,
+    2383.008,
+    33.0,
+    230.0
+   ],
+   "center": [
+    2186.501,
+    30.0,
+    230.0
+   ],
+   "parts": [
+    1
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 37,
+   "part_names": [
+    "Vorderwand_rechts"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 8 mm (\u2264 10 mm, unkritisch), 1368 mm\u00b2 bei z=58.0",
+   "value": 7.96,
+   "area": 1368.0,
+   "box": [
+    2011.0,
+    101.0,
+    58.0,
+    2104.0,
+    171.0,
+    58.0
+   ],
+   "center": [
+    2057.5,
+    156.667,
+    58.0
+   ],
+   "parts": [
+    26
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 38,
+   "part_names": [
+    "Kabelweg_AC_Netzteil"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 8 mm (\u2264 10 mm, unkritisch), 736 mm\u00b2 bei z=240.0",
+   "value": 8.0,
+   "area": 736.0,
+   "box": [
+    2011.0,
+    138.0,
+    240.0,
+    2070.0,
+    171.0,
+    240.0
+   ],
+   "center": [
+    2027.75,
+    148.25,
+    240.0
+   ],
+   "parts": [
+    26
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 39,
+   "part_names": [
+    "Kabelweg_AC_Netzteil"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 8 mm (\u2264 10 mm, unkritisch), 592 mm\u00b2 bei z=32.0",
+   "value": 7.94,
+   "area": 592.0,
+   "box": [
+    2246.0,
+    143.0,
+    32.0,
+    2254.0,
+    209.0,
+    32.0
+   ],
+   "center": [
+    2250.0,
+    190.5,
+    32.0
+   ],
+   "parts": [
+    24
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 40,
+   "part_names": [
+    "Kabelweg_Netzleitung"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 8 mm (\u2264 10 mm, unkritisch), 208 mm\u00b2 bei z=240.0",
+   "value": 7.86,
+   "area": 208.0,
+   "box": [
+    2106.0,
+    64.0,
+    240.0,
+    2114.0,
+    90.0,
+    240.0
+   ],
+   "center": [
+    2110.0,
+    77.0,
+    240.0
+   ],
+   "parts": [
+    25
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 41,
+   "part_names": [
+    "Kabelweg_USBC_Laptop"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 2 mm (\u2264 10 mm, unkritisch), 160 mm\u00b2 bei z=210.0",
+   "value": 2.0,
+   "area": 160.0,
+   "box": [
+    2210.0,
+    228.0,
+    210.0,
+    2290.0,
+    230.0,
+    210.0
+   ],
+   "center": [
+    2250.0,
+    229.0,
+    210.0
+   ],
+   "parts": [
+    18
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 42,
+   "part_names": [
+    "Wand_Steckdose_Platzhalter"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 5 mm (\u2264 10 mm, unkritisch), 90 mm\u00b2 bei z=305.0",
+   "value": 5.01,
+   "area": 90.0,
+   "box": [
+    2075.0,
+    177.0,
+    305.0,
+    2080.0,
+    195.0,
+    305.0
+   ],
+   "center": [
+    2077.5,
+    186.0,
+    305.0
+   ],
+   "parts": [
+    2
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 43,
+   "part_names": [
+    "Rueckwand"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 5 mm (\u2264 10 mm, unkritisch), 90 mm\u00b2 bei z=305.0",
+   "value": 5.01,
+   "area": 90.0,
+   "box": [
+    2103.0,
+    177.0,
+    305.0,
+    2108.0,
+    195.0,
+    305.0
+   ],
+   "center": [
+    2105.5,
+    186.0,
+    305.0
+   ],
+   "parts": [
+    2
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 44,
+   "part_names": [
+    "Rueckwand"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 5 mm (\u2264 10 mm, unkritisch), 90 mm\u00b2 bei z=305.0",
+   "value": 5.01,
+   "area": 90.0,
+   "box": [
+    2131.0,
+    177.0,
+    305.0,
+    2136.0,
+    195.0,
+    305.0
+   ],
+   "center": [
+    2133.5,
+    186.0,
+    305.0
+   ],
+   "parts": [
+    2
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 45,
+   "part_names": [
+    "Rueckwand"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 5 mm (\u2264 10 mm, unkritisch), 90 mm\u00b2 bei z=305.0",
+   "value": 5.01,
+   "area": 90.0,
+   "box": [
+    2159.0,
+    177.0,
+    305.0,
+    2164.0,
+    195.0,
+    305.0
+   ],
+   "center": [
+    2161.5,
+    186.0,
+    305.0
+   ],
+   "parts": [
+    2
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 46,
+   "part_names": [
+    "Rueckwand"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 5 mm (\u2264 10 mm, unkritisch), 90 mm\u00b2 bei z=305.0",
+   "value": 5.01,
+   "area": 90.0,
+   "box": [
+    2187.0,
+    177.0,
+    305.0,
+    2192.0,
+    195.0,
+    305.0
+   ],
+   "center": [
+    2189.5,
+    186.0,
+    305.0
+   ],
+   "parts": [
+    2
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 47,
+   "part_names": [
+    "Rueckwand"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 5 mm (\u2264 10 mm, unkritisch), 90 mm\u00b2 bei z=305.0",
+   "value": 5.01,
+   "area": 90.0,
+   "box": [
+    2215.0,
+    177.0,
+    305.0,
+    2220.0,
+    195.0,
+    305.0
+   ],
+   "center": [
+    2217.5,
+    186.0,
+    305.0
+   ],
+   "parts": [
+    2
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 48,
+   "part_names": [
+    "Rueckwand"
+   ]
+  },
+  {
+   "kind": "bruecke",
+   "severity": "info",
+   "reason": "kurze Br\u00fccke 8 mm (\u2264 10 mm, unkritisch), 64 mm\u00b2 bei z=53.0",
+   "value": 7.65,
+   "area": 64.0,
+   "box": [
+    2096.0,
+    101.0,
+    53.0,
+    2104.0,
+    109.0,
+    53.0
+   ],
+   "center": [
+    2100.0,
+    105.0,
+    53.0
+   ],
+   "parts": [
+    26
+   ],
+   "view": [
+    0.0,
+    -90.0
+   ],
+   "mode": "overhang",
+   "n": 49,
+   "part_names": [
+    "Kabelweg_AC_Netzteil"
+   ]
+  },
+  {
+   "kind": "fokus",
+   "severity": "info",
+   "reason": "im Skript markiert: cad.focus('Laptopfach')",
+   "value": "Laptopfach",
+   "box": [
+    1965.0,
+    -172.0,
+    65.0,
+    2415.0,
+    278.0,
+    515.0
+   ],
+   "center": [
+    2190.0,
+    53.0,
+    290.0
+   ],
+   "parts": [],
+   "view": "top",
+   "mode": "shaded",
+   "focus": "Laptopfach",
+   "n": 50,
+   "part_names": []
+  },
+  {
+   "kind": "fokus",
+   "severity": "info",
+   "reason": "im Skript markiert: cad.focus('Schlitz_Eingang')",
+   "value": "Schlitz_Eingang",
+   "box": [
+    2345.0,
+    13.0,
+    310.0,
+    2425.0,
+    93.0,
+    390.0
+   ],
+   "center": [
+    2385.0,
+    53.0,
+    350.0
+   ],
+   "parts": [],
+   "view": "top",
+   "mode": "shaded",
+   "focus": "Schlitz_Eingang",
+   "n": 51,
+   "part_names": []
+  },
+  {
+   "kind": "fokus",
+   "severity": "info",
+   "reason": "im Skript markiert: cad.focus('Plattendurchlass')",
+   "value": "Plattendurchlass",
+   "box": [
+    1965.0,
+    110.0,
+    700.0,
+    2065.0,
+    210.0,
+    800.0
+   ],
+   "center": [
+    2015.0,
+    160.0,
+    750.0
+   ],
+   "parts": [],
+   "view": "top",
+   "mode": "shaded",
+   "focus": "Plattendurchlass",
+   "n": 52,
+   "part_names": []
+  },
+  {
+   "kind": "fokus",
+   "severity": "info",
+   "reason": "im Skript markiert: cad.focus('Kabelschacht')",
+   "value": "Kabelschacht",
+   "box": [
+    1965.0,
+    117.0,
+    633.0,
+    2065.0,
+    217.0,
+    733.0
+   ],
+   "center": [
+    2015.0,
+    167.0,
+    683.0
+   ],
+   "parts": [],
+   "view": "front",
+   "mode": "shaded",
+   "focus": "Kabelschacht",
+   "n": 53,
+   "part_names": []
+  },
+  {
+   "kind": "fokus",
+   "severity": "info",
+   "reason": "im Skript markiert: cad.focus('Wanddose_Ausschnitt')",
+   "value": "Wanddose_Ausschnitt",
+   "box": [
+    2140.0,
+    85.0,
+    40.0,
+    2360.0,
+    305.0,
+    260.0
+   ],
+   "center": [
+    2250.0,
+    195.0,
+    150.0
+   ],
+   "parts": [],
+   "view": "back",
+   "mode": "shaded",
+   "focus": "Wanddose_Ausschnitt",
+   "n": 54,
+   "part_names": []
+  },
+  {
+   "kind": "fokus",
+   "severity": "info",
+   "reason": "im Skript markiert: cad.focus('Netzfach')",
+   "value": "Netzfach",
+   "box": [
+    1980.0,
+    -105.0,
+    -92.0,
+    2400.0,
+    315.0,
+    328.0
+   ],
+   "center": [
+    2190.0,
+    105.0,
+    118.0
+   ],
+   "parts": [],
+   "view": "right",
+   "mode": "shaded",
+   "focus": "Netzfach",
+   "n": 55,
+   "part_names": []
+  },
+  {
+   "kind": "fokus",
+   "severity": "info",
+   "reason": "im Skript markiert: cad.focus('Plattenueberstand_rechts')",
+   "value": "Plattenueberstand_rechts",
+   "box": [
+    2340.0,
+    50.0,
+    663.0,
+    2460.0,
+    170.0,
+    783.0
+   ],
+   "center": [
+    2400.0,
+    110.0,
+    723.0
+   ],
+   "parts": [],
+   "view": "front",
+   "mode": "shaded",
+   "focus": "Plattenueberstand_rechts",
+   "n": 56,
+   "part_names": []
+  },
+  {
+   "kind": "fokus",
+   "severity": "info",
+   "reason": "im Skript markiert: cad.focus('Auflager_Fachboden')",
+   "value": "Auflager_Fachboden",
+   "box": [
+    75.0,
+    -7.0,
+    140.75,
+    155.0,
+    73.0,
+    220.75
+   ],
+   "center": [
+    115.0,
+    33.0,
+    180.75
+   ],
+   "parts": [],
+   "view": "right",
+   "mode": "shaded",
+   "focus": "Auflager_Fachboden",
+   "n": 57,
+   "part_names": []
+  },
+  {
+   "kind": "fokus",
+   "severity": "info",
+   "reason": "im Skript markiert: cad.focus('Mittelstuetze')",
+   "value": "Mittelstuetze",
+   "box": [
+    1125.0,
+    30.0,
+    648.0,
+    1275.0,
+    180.0,
+    798.0
+   ],
+   "center": [
+    1200.0,
+    105.0,
+    723.0
+   ],
+   "parts": [],
+   "view": "front",
+   "mode": "shaded",
+   "focus": "Mittelstuetze",
+   "n": 58,
+   "part_names": []
+  }
+ ],
+ "exit": 1
+}

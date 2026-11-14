@@ -1,0 +1,14 @@
+# Beispiel: ~/.config/systemd/user/cadworker.service  (Pfade anpassen, danach: systemctl --user daemon-reload)
+[Unit]
+Description=Headless-FreeCAD-Worker fuer cad
+
+[Service]
+Environment=QT_QPA_PLATFORM=offscreen
+# optional: Pfade ueber ~/.config/cad/env (siehe cad.env.example) oder hier setzen
+# Environment=CAD_DIR=%h/tools/freecad-cli
+# Environment=CAD_PROJEKT_ROOT=%h/cad-projekte
+ExecStart=%h/bin/freecad -c %h/tools/freecad-cli/cad_worker.py
+StandardInput=null
+Restart=no
+TimeoutStopSec=3
+UnsetEnvironment=DISPLAY WAYLAND_DISPLAY

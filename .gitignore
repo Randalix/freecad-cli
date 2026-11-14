@@ -1,0 +1,16 @@
+*.bak
+*.bak-*
+bak/
+__pycache__/
+*.pyc
+*.log
+*.FCBak
+.projekt_state.json
+# lokal, nicht im Repo: einmalige Migration, MCP-Betrieb, Notizen zur Einrichtung des Autors, sync.sh
+migration_*
+freecad-idle-stop.sh
+freecad-mcp-ondemand.sh
+freecad_rpc_start.py
+docs/
+sync.sh
+systemd/freecad-*

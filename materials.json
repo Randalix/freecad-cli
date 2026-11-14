@@ -1,0 +1,17 @@
+{
+  "pla": {
+    "label": "PLA (3D-Druck)",
+    "rgb": [
+      0.3,
+      0.55,
+      0.62
+    ],
+    "rough": 0.45,
+    "metal": 0.0,
+    "aliases": [
+      "petg",
+      "kunststoff"
+    ],
+    "match": "^(bin|lid|deckel|box|halter|schublade|fuss|kotbeutel|tempo|tuech)"
+  }
+}

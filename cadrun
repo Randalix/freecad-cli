@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+"""cadrun - Alias fuer `cad run` (alte Schreibweise: cadrun skript.py | -k skript.py | -c code | --status | --stop)."""
+import os, sys
+here = os.path.dirname(os.path.realpath(__file__))
+a = sys.argv[1:]
+if a == ["--status"]:
+    new = ["worker", "status"]
+elif a == ["--stop"]:
+    new = ["worker", "stop"]
+else:
+    new = ["run"] + a
+os.execv(sys.executable, [sys.executable, os.path.join(here, "cad")] + new)

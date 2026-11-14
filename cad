@@ -1,0 +1,1154 @@
+#!/usr/bin/env python3
+"""cad - FreeCAD fuer Agenten ohne GUI: ausfuehren, messen, ansehen, pruefen.
+
+  cad run <skript.py> [--report] [--look [ansicht]] [-k] [-v] [--json] [--timeout S] [-- args]
+  cad run -c "<code>"
+  cad info <datei.FCStd|step|stl>
+  cad look [datei] [--view iso|front|back|left|right|top|bottom[,..]] [--dir az,el] [--at x,y,z --size mm] [--box x0,y0,z0,x1,y1,z1]
+           [--mode shaded|wire|xray|overhang|section] [--section x=40.35] [--hotspot N] [--focus all|NAME] [--diff ALT NEU]
+           [--no-isolate] [--px N] [--persp] [-o bild.png] [--json]
+  cad look [datei] --style schoen [--room] [--explode dx,dy,dz|auto] [--section x=..] [--lens 40] [--dir=az,el] [--at x,y,z --size mm]
+           [--engine eevee|cycles] [--hide NAME,..] [--bg weiss|grau|transparent] [--glb out.glb]   (Stil fuer Menschen: Materialien, Perspektive, Schatten)
+  cad run <skript> --glb out.glb                      GLB (Meter, Y oben, Teile als benannte Meshes, PBR); im Skript: cad.material(name, "eiche|multiplex|hartholz|platzhalter|<eigene>")
+  cad materials list|add KEY --rgb r,g,b [--label --rough --metal --alias a,b --match REGEX]|rm KEY   eigene Materialien (materials.json), fuer alle Modelle
+  cad hotspots [datei] [--min-wall 0.8] [--json]     kritische Stellen nummeriert (duenne Wand, Ueberhang/Bruecke, Spalt, offenes Netz, Fokus)
+  cad check [datei] [--bed 256x256x256] [--json]     Druckbarkeit: Bett, geschlossen, Ueberhang, duenne Wand, Spalt, Teileabstand
+  cad worker status|stop|restart
+  cad projekt <name> | list | show [name] | aus      aktives Projekt setzen (legt /mnt/raid1/3d_print/<name>/ mit PROJEKT.md/CHANGELOG.md an)
+  cad version "<Label>" [--basiert-auf vNNN] | --nutze vNNN    neue Version vNNN_<datum>_<label>/{modell,slice,vorschau,messung}, setzt `aktuell`
+  cad freigabe "<Notiz>"                              freigabe.md in der aktiven Version (nur auf ausdruecklichen Wunsch des Nutzers); danach ist die Version gesperrt
+Ohne Datei arbeiten look/hotspots/check auf dem letzten Lauf im Worker. Nach Aenderungen an cadgeom.py/cadlib.py: cad worker restart.
+Exit: 0 ok, 1 Befund (hotspots: hoch/mittel; check: WARN/FAIL; info: ungueltige Form), 2 Skriptfehler/Aufruffehler, 3 Infrastruktur (Worker/Blender).
+Ausgaben: aktive Version <projekt>/vNNN_.../vorschau|modell|messung (ohne Projekt Fallback cad_out mit Warnung; nie in CAD_NO_OUTPUT_DIR), Bilder mit Textlegende. `cad look` ohne Argumente = Sheet (iso, front, right, top) mit mm-Lineal;
+Zoom mit --at/--size; --focus/--hotspot/--section zeigen nur die betroffenen Teile (--no-isolate = alle); cad.focus(name, center, size, view) im Skript."""
+import argparse, json, os, socket, subprocess, sys, time
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, HERE)
+import cadprojekt as cp  # noqa: E402  Projektstruktur/Versionen (14.11.2026)
+OUT_ROOT = os.environ.get("CAD_OUT", "/mnt/raid1/3d_print/cad_out")
+WIKI = os.environ.get("CAD_NO_OUTPUT_DIR", "")   # optional: Ordner, in den cad keine Ausgabe schreiben darf (z. B. ein Notizen-Vault)
+
+
+class Infra(Exception):
+    pass
+
+
+def sock_path():
+    d = os.environ.get("XDG_RUNTIME_DIR")
+    if not d or not os.path.isdir(d):
+        d = "/run/user/%d" % os.getuid()
+        if not os.path.isdir(d):
+            d = "/tmp"
+    return os.path.join(d, "cadworker.sock")
+
+
+SOCK = sock_path()
+
+
+def raw_call(req, timeout):
+    s = socket.socket(socket.AF_UNIX)
+    s.settimeout(3)
+    s.connect(SOCK)
+    s.settimeout(timeout)
+    s.sendall((json.dumps(req) + "\n").encode())
+    f = s.makefile("rb")
+    while True:
+        line = f.readline()
+        if not line:
+            raise Infra("Worker hat ohne Antwort aufgelegt (Absturz? naechster Aufruf startet ihn neu, sonst: cad worker restart)")
+        msg = json.loads(line.decode())
+        if msg.get("event") == "queued":
+            print("[cad] Worker beschaeftigt, %d vor dir - warte ..." % msg["ahead"], file=sys.stderr)
+            continue
+        return msg
+
+
+def status():
+    try:
+        return raw_call({"cmd": "status"}, 3)
+    except (OSError, ValueError, Infra):
+        return None
+
+
+def ensure():
+    if status():
+        return
+    subprocess.run(["systemctl", "--user", "start", "--no-block", "cadworker.service"], check=False)
+    for _ in range(150):
+        if status():
+            return
+        time.sleep(0.2)
+    raise Infra("Worker startet nicht (journalctl --user -u cadworker -n 20)")
+
+
+def call(req, timeout=900):
+    """Anfrage an den Worker. Infrastrukturfehler -> Infra mit Hinweis."""
+    ensure()
+    try:
+        return raw_call(req, timeout)
+    except socket.timeout:
+        raise Infra("Zeitueberschreitung nach %ds - Skript haengt? Abbruch: cad worker restart" % timeout)
+    except (OSError, ValueError) as e:
+        raise Infra("Worker nicht erreichbar (%s) - cad worker restart" % e)
+
+
+def fail(msg, code):
+    print("cad: " + msg, file=sys.stderr)
+    sys.exit(code)
+
+
+# ------------------------------------------------------------------------------------------------ run
+def cmd_run(a):
+    req = {"op": "run", "keep": a.keep, "cwd": os.getcwd(), "args": a.args, "report": a.report or a.json,
+           "projekt": dict(cp.load_state(), state_file=cp.state_file())}
+    if a.code is not None:
+        req["code"] = a.code
+    else:
+        if not a.script:
+            fail("run: Skript oder -c <code> angeben", 2)
+        p = os.path.abspath(a.script)
+        if not os.path.isfile(p):
+            fail("Skript nicht gefunden: %s" % a.script, 2)
+        req["file"] = p
+    t0 = time.time()
+    cold = status() is None
+    try:
+        r = call(req, a.timeout)
+    except Infra as e:
+        fail(str(e), 3)
+    out = {"ok": r.get("ok", False), "stdout": r.get("stdout", ""), "error": r.get("error"),
+           "seconds": r.get("seconds"), "report": r.get("report"), "focus": r.get("focus", [])}
+    code = 0
+    if r.get("error"):
+        code = 2
+    elif r.get("report") and any(not m.get("valid", True) for m in r["report"]):
+        code = 1
+    look = None
+    if a.look and code != 2:
+        lopts = look_parser().parse_args(["--view", a.look] if a.look != "sheet" else [])
+        lopts.json = a.json
+        look, lcode = do_look(lopts, quiet=True)
+        if lcode:
+            code = max(code, 3 if lcode == 3 else code)
+        out["look"] = look
+    glb = None
+    if a.glb and code != 2:
+        lopts = look_parser().parse_args(["--glb", a.glb])
+        glb, gcode = do_schoen(lopts, quiet=True, glb_only=True)
+        out["glb"] = {k: glb.get(k) for k in ("ok", "text", "glb")}
+        if gcode:
+            code = max(code, 3)
+    out["exit"] = code
+    if a.report and out["report"]:
+        stem = os.path.splitext(os.path.basename(a.script or "code"))[0]
+        mf = save_messung("report_%s.json" % stem, {"skript": req.get("file"), "zeit": time.strftime("%Y-%m-%d %H:%M:%S"), "report": out["report"]})
+        if mf:
+            out["report_json"] = mf
+            print("[cad] Messwerte: %s" % mf, file=sys.stderr)
+    if a.json:
+        print(json.dumps(out, indent=1, ensure_ascii=False))
+        sys.exit(code)
+    sys.stdout.write(out["stdout"])
+    if out["report"] and not r.get("report_printed"):
+        for m in out["report"]:
+            print("[report] " + m.get("text", m.get("error", "?")))
+    if r.get("error"):
+        print(r["error"], file=sys.stderr)
+        if a.verbose and r.get("traceback"):
+            print(r["traceback"], file=sys.stderr)
+    if look:
+        print(look["text"])
+    if glb:
+        print(glb["text"])
+    if out["focus"]:
+        print("[cad] Fokus-Bereiche: %s  (cad look --focus all)" % ", ".join(f["name"] for f in out["focus"]), file=sys.stderr)
+    if r.get("warning"):
+        print("[cad] Hinweis: " + r["warning"], file=sys.stderr)
+    print("[cad] %s, Skript %.2fs, gesamt %.2fs (%s)" % ("Fehler" if r.get("error") else "ok", r.get("seconds", 0),
+          time.time() - t0, "Worker kalt gestartet" if cold else "Worker warm"), file=sys.stderr)
+    sys.exit(code)
+
+
+# ------------------------------------------------------------------------------------------------ info
+def cmd_info(a):
+    p = os.path.abspath(a.file)
+    if not os.path.isfile(p):
+        fail("Datei nicht gefunden: %s" % a.file, 2)
+    try:
+        r = call({"op": "info", "file": p, "cwd": os.getcwd()}, a.timeout)
+    except Infra as e:
+        fail(str(e), 3)
+    if r.get("error"):
+        fail(r["error"].splitlines()[0], 2)
+    info = r["info"]
+    code = 1 if any(not m.get("valid", True) for m in info) else 0
+    if a.json:
+        print(json.dumps({"file": p, "objects": info, "exit": code}, indent=1))
+    else:
+        for m in info:
+            print(m["text"])
+    sys.exit(code)
+
+
+# ------------------------------------------------------------------------------------------------ look
+MODES = ("shaded", "wire", "xray", "overhang", "section")
+AXIS_VIEW = {"x": (90, 0), "y": (0, 0), "z": (0, 90)}          # Standard-Blickrichtung je Schnittachse (az, el)
+PRESET_AXIS = {"front": ("y", 1), "back": ("y", -1), "right": ("x", 1), "left": ("x", -1), "top": ("z", 1), "bottom": ("z", -1)}
+
+
+def look_parser():
+    ap = argparse.ArgumentParser(prog="cad look", description="Bild(er) mit mm-Lineal und Textlegende")
+    ap.add_argument("file", nargs="?", help="STL/FCStd/STEP; ohne Angabe: letzter Lauf im Worker")
+    ap.add_argument("--view", help="iso front back left right top bottom, kommagetrennt = Sheet; Standard: Sheet iso,front,right,top")
+    ap.add_argument("--dir", help="Blickrichtung az,el in Grad (az 0 = von vorn, 90 = von rechts; el 90 = von oben)")
+    ap.add_argument("--at", help="Zielpunkt x,y,z in Modell-mm"); ap.add_argument("--size", type=float, help="Ausschnittsgroesse in mm (mit --at, Standard 20)")
+    ap.add_argument("--box", help="x0,y0,z0,x1,y1,z1: Bereich einrahmen")
+    ap.add_argument("--focus", help="all oder Name eines cad.focus-Bereichs (zeigt nur die Teile im Bereich)")
+    ap.add_argument("--hotspot", type=int, metavar="N", help="Treffer Nr. N aus `cad hotspots` (Richtung/Modus automatisch, Legende nennt den Grund)")
+    ap.add_argument("--min-wall", type=float, default=0.8, help="Grenze fuer duenne Waende bei --hotspot (Standard 0.8 mm)")
+    ap.add_argument("--profile", choices=["print", "moebel"], default="print", help="print (Standard, Druckteile) | moebel: Bruecke/Ueberhang/Bett ausblenden (Bauteile ohne Druckbezug)" + " (bei --hotspot: Nummern des Profils)")
+    ap.add_argument("--mode", choices=MODES, help="shaded (Standard) | wire | xray (verdeckte Teile sichtbar) | overhang (Flaechen > 45 Grad rot) | section")
+    ap.add_argument("--section", metavar="x=40.35", help="Schnitt an der Ebene x|y|z=Wert: Schnittflaeche rot, Kontur und Masse. Blick von +X / von vorn / von oben (oder --view)")
+    ap.add_argument("--diff", nargs=2, metavar=("ALT", "NEU"), help="Aenderung zeigen: hinzugefuegt gruen, entfernt rot")
+    ap.add_argument("--keep-view", action="store_true", help="bei --focus: Ansicht des Skripts auch bei verdecktem Ziel behalten (nur Warnung, kein automatischer Wechsel)")
+    ap.add_argument("--no-isolate", action="store_true", help="bei --focus/--hotspot/--section nicht auf die betroffenen Teile beschraenken")
+    ap.add_argument("--px", type=int, help="Bildkante in Pixeln (Standard 800, Sheet 450 je Ansicht, max 1024)")
+    ap.add_argument("--persp", action="store_true", help="Perspektive statt orthografisch (Lineal entfaellt)")
+    ap.add_argument("--cut", type=float, help="wie --section, relativ: alles weiter als CUT mm vor der Zielebene (--at) wegschneiden (achsparallele --view)")
+    ap.add_argument("--edges", choices=["freestyle", "outline", "none"], default="freestyle")
+    ap.add_argument("--no-ruler", action="store_true")
+    g = ap.add_argument_group("Stil schoen (fuer Menschen: Materialien, Perspektive, Licht/Schatten; Cycles + Denoise) und GLB")
+    g.add_argument("--style", choices=["technik", "schoen"], default="technik", help="technik (Standard, Lineal/Messwerte) | schoen")
+    g.add_argument("--lens", type=float, default=40.0, help="schoen: Brennweite in mm (Kleinbild, Standard 40; 35-50 sinnvoll)")
+    g.add_argument("--room", action="store_true", help="schoen: Wand (Y = groesstes Y der Teile, --wall-y), Boden (Z=0) und Sofa-Block (Schaetzung) dazu")
+    g.add_argument("--wall-y", type=float, help="schoen --room: Lage der Wandflaeche (Standard: groesstes Y aller Teile)")
+    g.add_argument("--sofa", metavar="B,T,H", default="2400,960,750", help="schoen --room: Sofa-Block Breite,Tiefe,Hoehe in mm (Schaetzwerte; Rueckseite bei Y=0, Mitte unter dem Modell)")
+    g.add_argument("--explode", metavar="dx,dy,dz|auto", help="schoen: Explosionsansicht; Abstaende in mm je Achse (auto = 300,250,300), Teile nach Montagerichtung, mit Nummern und Legende")
+    g.add_argument("--numbers", action="store_true", help="schoen: Teile nummerieren und Legende Nummer -> Name -> Material (bei --explode automatisch)")
+    g.add_argument("--dims", action="store_true", help="schoen: Gesamtmasse (L/B/H der Bounding Box der sichtbaren Teile) als Bemassung ins Bild; einzelne Teile mit --hide isolieren")
+    g.add_argument("--hide", metavar="NAME,NAME", help="schoen: Teile ausblenden (Teilenamen, kommagetrennt; Praefix mit * am Ende moeglich: Kabelweg*)")
+    g.add_argument("--aspect", default=None, help="schoen: Seitenverhaeltnis Breite:Hoehe (Standard 16:10, bei --explode 4:3); --px = Breite (Standard 1600)")
+    g.add_argument("--samples", type=int, default=40, help="schoen: Samples (Cycles Standard 40 mit Denoise)")
+    g.add_argument("--engine", choices=["cycles", "eevee"], default="eevee", help="schoen: eevee (Standard, 5-10 s je Bild) | cycles (Pfadverfolgung, mit --samples 16..40, 1-3 min unter Last)")
+    g.add_argument("--bg", choices=["weiss", "grau", "transparent"], default="weiss", help="schoen ohne --room: Hintergrund (transparent = freigestellt, RGBA)")
+    g.add_argument("--no-legend", action="store_true", help="schoen: ohne Legendenstreifen")
+    g.add_argument("--glb", metavar="out.glb", help="glTF-Binaer exportieren (Meter, Y oben, Teile = benannte Meshes, PBR); mit --room auch Raum")
+    ap.add_argument("-o", "--out", help="Ausgabedatei (Standard: <aktive Version>/vorschau/<name>_<ansicht>.png, ohne Projekt %s)" % OUT_ROOT)
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--timeout", type=int, default=300)
+    return ap
+
+
+def safe_out(p):
+    ap_, rp = os.path.abspath(p), os.path.realpath(p)
+    for x in (ap_, rp):
+        if WIKI and (x == WIKI or x.startswith(WIKI + os.sep)) and not os.environ.get("CAD_ALLOW_WIKI"):
+            fail("Ausgabe in %s verboten (CAD_NO_OUTPUT_DIR) - Bilder gehoeren in die Projektstruktur (cad projekt/cad version)" % p, 2)
+    try:
+        w = cp.check_write(ap_)
+    except cp.Gesperrt as e:
+        fail(str(e), 2)
+    if w:
+        print("[cad] Hinweis: " + w, file=sys.stderr)
+    return ap_
+
+
+_WARNED = set()
+
+
+def default_dir(kind):
+    """Ausgabeordner der aktiven Version (modell|slice|vorschau|messung); ohne Projekt cad_out mit Warnzeile."""
+    try:
+        d, warn = cp.outdir(kind)
+    except cp.Fehler as e:
+        fail(str(e), 2)
+    if warn and warn not in _WARNED:
+        _WARNED.add(warn)
+        print("[cad] WARNUNG: " + warn, file=sys.stderr)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def glb_path(g):
+    """--glb name.glb ohne Ordner -> modell/ der aktiven Version (sonst wie angegeben)."""
+    if g and not os.path.dirname(g):
+        return os.path.join(default_dir("modell"), g)
+    return g
+
+
+def save_messung(name, data):
+    """JSON-Messwerte nach messung/ der aktiven Version (nur mit aktivem Projekt); gibt den Pfad zurueck."""
+    p, v, vdir = cp.active()
+    if not vdir:
+        return None
+    try:
+        d, _ = cp.outdir("messung")
+    except cp.Fehler as e:
+        print("[cad] Hinweis: Messwerte nicht gespeichert: %s" % e, file=sys.stderr)
+        return None
+    f = safe_out(os.path.join(d, name))
+    with open(f, "w") as fh:
+        json.dump(data, fh, indent=1, ensure_ascii=False, default=str)
+    return f
+
+
+def _intersects(bb, reg, pad=0.0):
+    return all(bb[i] <= reg[i + 3] + pad and bb[i + 3] >= reg[i] - pad for i in range(3))
+
+
+def _frame_box(box, min_half=5.0):
+    """Hotspot-Box -> Bildausschnitt: Rand und Mindestgroesse (kleine Stellen werden nicht zum Punkt gezoomt)."""
+    ext = [box[i + 3] - box[i] for i in range(3)]
+    pad = max(2.0, 0.15 * max(ext))
+    out = []
+    ctr = [(box[i] + box[i + 3]) / 2 for i in range(3)]
+    half = [max(ext[i] / 2 + pad, min_half) for i in range(3)]
+    return [ctr[i] - half[i] for i in range(3)] + [ctr[i] + half[i] for i in range(3)]
+
+
+def _legend_items(mode, cr):
+    if mode == "overhang":
+        c = cr.OVERHANG_COLORS
+        return [{"rgb": c["slant"], "text": "Überhang < 45° (schräg, kritisch)"},
+                {"rgb": c["bridge"], "text": "waagerechte Unterseite (Brücke; > 10 mm kritisch, siehe cad hotspots)"},
+                {"rgb": c["neutral"], "text": "unkritisch"}]
+    if mode == "section":
+        return [{"rgb": cr.CAP_COLOR, "text": "Schnittfläche"}]
+    return []
+
+
+def parse_section(spec):
+    try:
+        k, v = spec.replace(" ", "").split("=")
+        if k.lower() not in ("x", "y", "z"):
+            raise ValueError
+        return k.lower(), float(v.replace(",", "."))
+    except ValueError:
+        fail("--section erwartet x=Wert, y=Wert oder z=Wert (z. B. --section x=40.35)", 2)
+
+
+def do_look(a, quiet=False):
+    import cad_render as cr
+    if a.style == "schoen":
+        return do_schoen(a, quiet)
+    for opt, val in (("--room", a.room), ("--explode", a.explode), ("--numbers", a.numbers), ("--dims", a.dims), ("--hide", a.hide), ("--lens", a.lens != 40.0),
+                     ("--bg", a.bg != "weiss"), ("--engine", a.engine != "eevee"), ("--samples", a.samples != 40), ("--aspect", a.aspect)):
+        if val:
+            fail("%s gilt nur mit --style schoen" % opt, 2)
+    if a.glb:
+        gres, gcode = do_schoen(a, quiet, glb_only=True)
+        if not quiet:
+            print(gres["text"])
+        if gcode:
+            return gres, gcode
+    if a.diff:
+        return do_diff(a, cr, quiet)
+    src = a.file
+    stls, focus, stem = None, [], "lauf"
+    if src:
+        src = os.path.abspath(src)
+        if not os.path.isfile(src):
+            fail("Datei nicht gefunden: %s" % a.file, 2)
+        stem = os.path.splitext(os.path.basename(src))[0]
+    mode = a.mode
+    section = None                       # (axis, pos)
+    if a.section:
+        section = parse_section(a.section)
+        mode = mode or "section"
+    if a.cut is not None and not a.section:
+        if not a.at:
+            fail("--cut braucht --at (Zielpunkt); besser --section x|y|z=Wert", 2)
+        nm = a.view if a.view and "," not in a.view else None
+        if nm not in PRESET_AXIS:
+            fail("--cut braucht eine achsparallele --view (front back left right top bottom); sonst --section benutzen", 2)
+        ax, sg = PRESET_AXIS[nm]
+        at = cr.parse_vec(a.at, 3)
+        section = (ax, at["xyz".index(ax)] - sg * a.cut)
+        mode = mode or "section"
+    if mode == "section" and not section and not a.hotspot:
+        fail("--mode section braucht --section x|y|z=Wert (oder --hotspot N)", 2)
+    isolate = not a.no_isolate
+    need_worker = bool(a.hotspot or section or a.focus or not src or not src.lower().endswith(".stl"))
+    h = None
+    contours = {}
+    assess = {}
+    req = {"op": "look", "file": src, "cwd": os.getcwd(), "hotspot": a.hotspot, "min_wall": a.min_wall, "profile": a.profile,
+           "components": bool(isolate and (a.hotspot or section or a.focus)), "mode": mode}
+    if a.focus:
+        req["assess_focus"] = a.focus
+    if section:
+        req["section"] = {"axis": section[0], "pos": section[1]}
+    if need_worker:
+        try:
+            r = call(req, a.timeout)
+        except Infra as e:
+            fail(str(e), 3)
+        if r.get("error"):
+            fail(r["error"].splitlines()[0], 2)
+        stls, focus, stem, zref = r["stls"], r.get("focus", []), r.get("stem", stem), r.get("zref")
+        h = r.get("hotspot")
+        contours = r.get("contours") or {}
+        assess = r.get("assess") or {}
+    else:
+        stls, zref = [{"path": src, "name": stem, "item": 0, "comp": None}], None
+    views, tag, sheet = [], "", False
+    px = a.px
+    only_sets = []                       # je Ansicht: Indizes der sichtbaren Modelle (None = alle)
+    caption, notes = [], []
+    sec_job = None
+
+    def isolate_for(region, pad=0.5):
+        if not isolate or not all(s.get("comp") is not None for s in stls):
+            return None
+        keep = [i for i, s in enumerate(stls) if _intersects(s["bbox"], region, pad)]
+        return keep if keep and len(keep) < len(stls) else None
+
+    def iso_text(keep, prefix=""):
+        """Kurz: 'N von M Teilen, ausgeblendet: a, b, c (+k)'; sichtbare Teile nur namentlich, wenn es hoechstens 4 sind."""
+        if keep is None:
+            return None
+        hid = [s["name"] for i, s in enumerate(stls) if i not in keep]
+        shown = (" (%s)" % ", ".join(stls[i]["name"] for i in keep)) if len(keep) <= 4 else ""
+        return "%s%d von %d Teilen%s, ausgeblendet: %s%s" % (prefix, len(keep), len(stls), shown, ", ".join(hid[:3]), " (+%d)" % (len(hid) - 3) if len(hid) > 3 else "")
+
+    try:
+        if h and not a.focus:
+            tag = "hotspot%d" % a.hotspot
+            hmode = mode or h["mode"]
+            box = _frame_box(h["box"])
+            if hmode == "section" and (section or h.get("section")):
+                ax, pos = section or (h["section"]["axis"], h["section"]["pos"])
+                dirv = AXIS_VIEW[ax]
+                views.append(cr.view_from_args(dir_=list(dirv), box=box, px=px))
+                mode, section = "section", (ax, pos)
+            else:
+                mode = hmode if hmode != "section" else "shaded"
+                v = h["view"]
+                kw = {"dir_": v} if isinstance(v, (list, tuple)) else {"name": v}
+                views.append(cr.view_from_args(box=box, px=px, persp=a.persp, **kw))
+            only = isolate_for(h["box"], 1.0)
+            only_sets.append(only)
+            caption.append("Hotspot %d/%d [%s] %s | Box x %.2f..%.2f y %.2f..%.2f z %.2f..%.2f" % (
+                a.hotspot, r.get("n_hotspots", 0), h["severity"], h["reason"], h["box"][0], h["box"][3], h["box"][1], h["box"][4], h["box"][2], h["box"][5]))
+            if iso_text(only):
+                caption.append("isoliert: " + iso_text(only) + " (--no-isolate zeigt alle)")
+            if mode == "section":
+                tag += "_section_%s" % section[0]
+        elif a.focus:
+            if not focus:
+                fail("keine cad.focus-Bereiche vorhanden (im Skript cad.focus(name, center, size, view) aufrufen, dann cad run)", 2)
+            sel = focus if a.focus == "all" else [f for f in focus if f["name"] == a.focus]
+            if not sel:
+                fail("Fokus %r unbekannt, vorhanden: %s" % (a.focus, ", ".join(f["name"] for f in focus)), 2)
+            if len(sel) > 1 and not px:
+                px = 430 if len(sel) > 4 else 640            # Sheet ca. 1400 px breit (3 bzw. 2 Spalten)
+            for f in sel:
+                v = f["view"]
+                kw = {"dir_": v} if isinstance(v, (list, tuple)) else {"name": v}
+                c, hs = f["center"], f["size"] / 2
+                only = isolate_for([c[0] - hs, c[1] - hs, c[2] - hs, c[0] + hs, c[1] + hs, c[2] + hs])
+                asm = assess.get(f["name"]) or {}
+                vname = v if isinstance(v, str) else "dir %g,%g" % tuple(v)
+                xray_tile, mark = False, ""
+                if asm.get("problem") == "verdeckt":
+                    tg = ", ".join(asm["hidden_targets"])
+                    occ = ", ".join(sorted(set(o for o in (asm.get("occluders") or {}).values() if o)))
+                    alt = asm.get("alternative")
+                    why = "Ziel %s in Ansicht %s verdeckt%s" % (tg, vname, " (durch %s)" % occ if occ else "")
+                    if a.keep_view:
+                        notes.append("%s: WARNUNG %s; Vorschlag: --view %s oder --mode xray (--keep-view behält die Skript-Ansicht)" % (f["name"], why, alt["view"] if alt else "iso"))
+                        mark = "! "
+                    elif alt:
+                        kw = {"dir_": alt["dir"]}
+                        notes.append("%s: %s -> Ansicht automatisch gewechselt auf %s (--keep-view behält %s)" % (f["name"], why, alt["view"], vname))
+                        mark = "-> %s: " % alt["view"]
+                    else:
+                        xray_tile = True
+                        notes.append("%s: %s, keine Achsansicht gibt es frei -> automatisch xray (--keep-view behält die Ansicht)" % (f["name"], why))
+                        mark = "xray: "
+                views.append(cr.view_from_args(at=f["center"], size=f["size"], persp=a.persp, px=px, label=f["name"], **kw))
+                if xray_tile:
+                    views[-1]["xray"] = True
+                only_sets.append(only)
+                views[-1]["focus_name"] = "%s%s [%s]" % (mark, f["name"], ("%d/%d Teile" % (len(only), len(stls))) if only else "alle Teile")
+                if only:
+                    notes.append("%s: %s" % (f["name"], iso_text(only)))
+            caption += notes
+            sheet = len(views) > 1
+            tag = "focus_" + a.focus
+        elif section:
+            ax, pos = section
+            dirv = AXIS_VIEW[ax]
+            if a.view and "," not in a.view and a.view in PRESET_AXIS and PRESET_AXIS[a.view][0] == ax:
+                dirv = cr.PRESETS[a.view]
+            elif a.dir:
+                dirv = cr.parse_vec(a.dir, 2)
+            keep = [i for i, s in enumerate(stls) if s["bbox"]["xyz".index(ax)] - 1e-6 <= pos <= s["bbox"]["xyz".index(ax) + 3] + 1e-6]
+            if not keep:
+                fail("Schnittebene %s=%g trifft kein Teil (Modell %s %.2f..%.2f)" % (ax, pos, ax, min(s["bbox"]["xyz".index(ax)] for s in stls),
+                                                                                  max(s["bbox"]["xyz".index(ax) + 3] for s in stls)), 2)
+            only = keep if (isolate and len(keep) < len(stls) and all(s.get("comp") is not None for s in stls)) else None
+            only_sets.append(only)
+            tag = "section_%s%g" % (ax, pos)
+            views.append(dirv)
+        elif a.at or a.box or a.dir or (a.view and "," not in a.view):
+            views.append(cr.view_from_args(None if a.dir else (a.view or "iso"), a.dir, a.at, a.size, a.box, a.persp, px))
+            only_sets.append(None)
+            tag = ("at_%s" % a.at.replace(",", "_") if a.at else "box" if a.box else
+                   "dir_%s" % a.dir.replace(",", "_") if a.dir else a.view or "iso")
+            if a.at:
+                tag += "_" + (a.view or a.dir or "iso").replace(",", "_")
+        else:
+            names = a.view.split(",") if a.view else cr.SHEET_VIEWS
+            views = [cr.view_from_args(n, persp=a.persp, px=px) for n in names]
+            only_sets = [None] * len(views)
+            sheet = True
+            tag = "sheet" if not a.view else "sheet_" + "_".join(names)
+    except ValueError as e:
+        fail(str(e), 2)
+
+    sec_job = None
+    if mode == "section" and section:
+        ax, pos = section
+        ai = "xyz".index(ax)
+        keep = only_sets[0] if only_sets and only_sets[0] is not None else list(range(len(stls)))
+        segs = []
+        for i in keep:
+            segs += contours.get(stls[i]["path"], [])
+        if not segs:
+            fail("Schnitt %s=%g: keine Kontur (Netz nicht geschlossen oder Ebene trifft nichts)" % (ax, pos), 2)
+        allp = [pt for sg in segs for pt in sg]
+        lo = [min(p[i] for p in allp) for i in range(3)]
+        hi = [max(p[i] for p in allp) for i in range(3)]
+        if isinstance(views[0], tuple) or isinstance(views[0], list):          # --section ohne Hotspot: Ausschnitt aus der Kontur
+            pad = max(2.0, 0.06 * max(hi[i] - lo[i] for i in range(3)))
+            box = [lo[i] - pad for i in range(3)] + [hi[i] + pad for i in range(3)]
+            if a.at and a.size:
+                at = cr.parse_vec(a.at, 3)
+                views[0] = cr.view_from_args(dir_=list(views[0]), at=at, size=a.size, px=px)
+            else:
+                views[0] = cr.view_from_args(dir_=list(views[0]), box=box, px=px)
+        measure = (h or {}).get("measure") if h and mode == "section" else None
+        if a.at and not h:
+            measure = cr.parse_vec(a.at, 3)
+        if measure is None:
+            measure = [(lo[i] + hi[i]) / 2 for i in range(3)]
+        measure = list(measure)
+        measure[ai] = pos
+        clip_pt = [0.0, 0.0, 0.0]
+        clip_pt[ai] = pos
+        views[0]["clip_at"] = clip_pt
+        sec_job = {"axis": ax, "axis_i": ai, "pos": pos, "contours": segs, "measure": measure}
+        side = {"x": "Blick von +X, behält x < %g", "y": "Blick von vorn (-Y), behält y > %g", "z": "Blick von oben, behält z < %g"}[ax] % pos
+        if a.view in PRESET_AXIS and PRESET_AXIS[a.view][0] == ax:
+            side = "Blick %s" % a.view
+        others = [k for k in "xyz" if k != ax]
+        caption.append("Schnitt %s=%g (%s). Schnittfläche rot, Kontur schwarz; blaue Maße = Materialstrecken entlang waagerechter/senkrechter Messlinie durch das rote Kreuz (mm). Umfang des geschnittenen Teils (ganzes Teil, nicht der sichtbare Ausschnitt; dessen Grenzen zeigt das Lineal im Bild): %s %.2f..%.2f (%.2f mm), %s %.2f..%.2f (%.2f mm)" % (
+            ax, pos, side, others[0], lo["xyz".index(others[0])], hi["xyz".index(others[0])], hi["xyz".index(others[0])] - lo["xyz".index(others[0])],
+            others[1], lo["xyz".index(others[1])], hi["xyz".index(others[1])], hi["xyz".index(others[1])] - lo["xyz".index(others[1])]))
+        if only_sets[0] is not None and not a.hotspot:
+            caption.append(iso_text(only_sets[0]))
+    for i, v in enumerate(views):
+        if only_sets[i] is not None:
+            v["only"] = only_sets[i]
+    mode = mode or "shaded"
+    if mode in ("xray", "wire"):
+        caption.append("Modus %s: sichtbare Kanten schwarz, verdeckte Kanten blau%s" % (mode, " (Flächen ausgeblendet)" if mode == "wire" else " (Flächen durchscheinend)"))
+    if mode == "overhang":
+        caption.append("Überhang-Prüfung wie overhang_check.py: Normale nach unten, flacher als 45° gegen die Waagerechte, Druckrichtung +Z, Fußlage wie die Datei; erste 0,3 mm über der Platte ausgenommen")
+    out = safe_out(a.out or os.path.join(default_dir("vorschau"), "%s_%s.png" % (stem, tag + ("_" + mode if mode not in ("shaded",) and mode not in tag else ""))))
+    models = [{"path": s["path"], "color": list(cr.PALETTE[s.get("item", i) % len(cr.PALETTE)])} for i, s in enumerate(stls)]
+    job = {"models": models, "out": out, "views": views, "sheet": sheet, "edges": a.edges, "ruler": not a.no_ruler,
+           "mode": mode, "caption": caption, "legend_items": _legend_items(mode, cr)}
+    if zref is not None:
+        job["zref"] = zref
+    if sec_job:
+        job["section"] = sec_job
+    res = cr.run_job(job, timeout=a.timeout)
+    if not res.get("ok"):
+        if quiet:
+            return {"ok": False, "text": "cad: Render fehlgeschlagen: %s" % res.get("error")}, 3
+        err = str(res.get("error"))
+        fail("Render fehlgeschlagen: %s" % err.strip(), 2 if "STL" in err else 3)
+    text = cr.legend_text(res)
+    if any("triangles" in s for s in stls):
+        text += "\n  Objekte: " + ", ".join("%s (%d Dreiecke)" % (s.get("name"), s.get("triangles", 0)) for s in stls)
+    res["text"] = text
+    res["stl"] = [s["path"] for s in stls]
+    if h:
+        res["hotspot"] = h
+    return res, 0
+
+
+def do_diff(a, cr, quiet=False):
+    old, new = [os.path.abspath(x) for x in a.diff]
+    for f in (old, new):
+        if not os.path.isfile(f):
+            fail("Datei nicht gefunden: %s" % f, 2)
+    try:
+        r = call({"op": "diff", "file": old, "file2": new, "cwd": os.getcwd()}, a.timeout)
+    except Infra as e:
+        fail(str(e), 3)
+    if r.get("error"):
+        fail(r["error"].splitlines()[0], 2)
+    st = r["stats"]
+    names = r["names"]
+    try:
+        if a.view and "," not in a.view or a.at or a.box or a.dir:
+            views = [cr.view_from_args(None if a.dir else (a.view or "iso"), a.dir, a.at, a.size, a.box, a.persp, a.px)]
+            sheet, tag = False, "diff_" + (a.view or "view")
+        else:
+            views = [cr.view_from_args(n, persp=a.persp, px=a.px) for n in (a.view.split(",") if a.view else cr.SHEET_VIEWS)]
+            sheet, tag = True, "diff"
+    except ValueError as e:
+        fail(str(e), 2)
+    items = [{"rgb": f["color"], "text": f["name"]} for f in r["stls"]]
+    cap = ["Diff alt=%s neu=%s: hinzugefügt %.0f mm² (grün), entfernt %.0f mm² (rot, soweit nicht verdeckt); Volumen %.0f -> %.0f mm³ (%+.0f); BBox alt %.1f x %.1f x %.1f, neu %.1f x %.1f x %.1f mm" % (
+        names[0], names[1], st["added_area"], st["removed_area"], st["volume_old"], st["volume_new"], st["dvolume"],
+        st["bbox_old"][3] - st["bbox_old"][0], st["bbox_old"][4] - st["bbox_old"][1], st["bbox_old"][5] - st["bbox_old"][2],
+        st["bbox_new"][3] - st["bbox_new"][0], st["bbox_new"][4] - st["bbox_new"][1], st["bbox_new"][5] - st["bbox_new"][2]),
+        "Verfahren: Flächenabstand beider Netze (Toleranz %.2f mm), kein Volumen-Boolean: eine Fläche gilt als neu/entfernt, wenn mehr als die Hälfte ihrer Punkte weiter als die Toleranz vom anderen Netz entfernt ist" % st["tol"]]
+    out = safe_out(a.out or os.path.join(default_dir("vorschau"), "%s_%s.png" % (r["stem"], tag)))
+    job = {"models": [{"path": f["path"], "color": f["color"]} for f in r["stls"]], "out": out, "views": views, "sheet": sheet,
+           "edges": a.edges, "ruler": not a.no_ruler, "mode": a.mode if a.mode in ("xray", "wire") else "shaded", "caption": cap, "legend_items": items}
+    res = cr.run_job(job, timeout=a.timeout)
+    if not res.get("ok"):
+        fail("Render fehlgeschlagen: %s" % str(res.get("error")).strip(), 3)
+    res["text"] = cr.legend_text(res)
+    res["diff"] = st
+    return res, 0
+
+
+SCHOEN_SECTION_DIR = {"x": (68, 16), "y": (-18, 12), "z": (-20, 55)}      # Standard-Blickrichtung (az, el) je Schnittachse im schoenen Stil
+
+
+def _stl_bbox(path):
+    """[xmin, ymin, zmin, xmax, ymax, zmax] einer STL (binaer oder ASCII), nur Standardbibliothek.
+    14.11.2026: STL-Teile im Stil schoen hatten kein 'bbox' (KeyError bei wall_y)."""
+    import struct
+    lo, hi = [float("inf")] * 3, [float("-inf")] * 3
+
+    def add(x, y, z):
+        for k, v in enumerate((x, y, z)):
+            if v < lo[k]: lo[k] = v
+            if v > hi[k]: hi[k] = v
+    size = os.path.getsize(path)
+    with open(path, "rb") as f:
+        head = f.read(84)
+        n = struct.unpack("<I", head[80:84])[0] if len(head) == 84 else -1
+        if n >= 0 and 84 + 50 * n == size:                       # binaer
+            data = f.read()
+            for t in struct.iter_unpack("<12fH", data):
+                add(*t[3:6]); add(*t[6:9]); add(*t[9:12])
+        else:                                                    # ASCII
+            f.seek(0)
+            for line in f:
+                s = line.split()
+                if len(s) == 4 and s[0] == b"vertex":
+                    add(float(s[1]), float(s[2]), float(s[3]))
+    if lo[0] == float("inf"):
+        return [0.0] * 6
+    return [round(v, 3) for v in lo + hi]
+
+
+def do_schoen(a, quiet=False, glb_only=False):
+    """Stil schoen: Teile exportieren (Worker), Materialien nach Bauteil, Blender-Job (cad_schoen.py), optional GLB."""
+    import cad_render as cr
+    import cad_schoen as cs
+    if not glb_only and (a.diff or a.hotspot or a.focus or a.mode not in (None, "shaded")):
+        fail("--style schoen kennt kein --diff/--hotspot/--focus/--mode (dafuer --style technik)", 2)
+    src = a.file
+    stem = "lauf"
+    if src:
+        src = os.path.abspath(src)
+        if not os.path.isfile(src):
+            fail("Datei nicht gefunden: %s" % a.file, 2)
+        stem = os.path.splitext(os.path.basename(src))[0]
+    if src and src.lower().endswith(".stl"):
+        parts = [{"path": src, "name": stem, "mat": cs.default_material(stem), "bbox": _stl_bbox(src)}]
+    else:
+        try:
+            r = call({"op": "export", "file": src, "cwd": os.getcwd()}, a.timeout)
+        except Infra as e:
+            fail(str(e), 3)
+        if r.get("error"):
+            fail(r["error"].splitlines()[0], 2)
+        parts, stem = r["stls"], r.get("stem", stem)
+    # Teile ausblenden
+    hide = []
+    if a.hide:
+        for pat in a.hide.split(","):
+            pat = pat.strip()
+            hide += [p["name"] for p in parts if (p["name"].startswith(pat[:-1]) if pat.endswith("*") else p["name"] == pat)]
+        if not hide:
+            fail("--hide: kein Teil passt zu %r (Teile: %s)" % (a.hide, ", ".join(p["name"] for p in parts[:8])), 2)
+    if a.explode:
+        hide += [p["name"] for p in parts if cs.is_cable(p["name"]) and p["name"] not in hide]
+    # Kamera
+    try:
+        asp = [float(x) for x in (a.aspect or ("4:3" if a.explode else "16:10")).split(":")]
+        aspect = asp[0] / asp[1]
+        sec = None
+        if a.section and not glb_only:
+            ax, pos = parse_section(a.section)
+            sec = {"axis": ax, "pos": pos}
+        if glb_only:
+            dirv = [-32, 24]
+        elif a.dir:
+            dirv = cr.parse_vec(a.dir, 2)
+        elif a.view:
+            if "," in a.view or a.view not in cr.PRESETS:
+                raise ValueError("--style schoen: genau eine --view (iso front back left right top bottom) oder --dir az,el")
+            dirv = list(cr.PRESETS[a.view])
+        elif sec:
+            dirv = list(SCHOEN_SECTION_DIR[sec["axis"]])
+        else:
+            dirv = [-32, 24]
+        at = cr.parse_vec(a.at, 3) if a.at and not glb_only else None
+        explode = None
+        if a.explode:
+            explode = "auto" if a.explode == "auto" else cr.parse_vec(a.explode, 3)
+        sofa = cr.parse_vec(a.sofa, 3)
+    except (ValueError, ZeroDivisionError) as e:
+        fail(str(e), 2)
+    if sec and explode:
+        fail("--section und --explode lassen sich nicht kombinieren", 2)
+    wall_y = a.wall_y if a.wall_y is not None else max(p["bbox"][4] for p in parts if p["name"] not in hide)
+    # Dateiname
+    tag = []
+    if a.room: tag.append("raum")
+    if explode: tag.append("explosion")
+    if sec: tag.append("schnitt_%s%g" % (sec["axis"], sec["pos"]))
+    if not (a.room or explode or sec): tag.append("ansicht")
+    out = None
+    if not glb_only:
+        out = safe_out(a.out or os.path.join(default_dir("vorschau"), "%s_schoen_%s.png" % (stem, "_".join(tag))))
+    glb = safe_out(glb_path(a.glb)) if a.glb else None
+    caption = []
+    if a.room and not explode:
+        caption.append("Raum: Wand bei Y=%g mm (aus dem Modell: größtes Y der Teile), Boden Z=0, Sofa %g x %g x %g mm (Schätzung, Rückseite bei Y=0, Rückenlehne dahinter, Blockform)." % (wall_y, *sofa))
+    if explode:
+        caption.append("Explosionsansicht: Teile entlang ihrer Montagerichtung auseinandergezogen (Abstände %s mm in x, y, z); gestrichelt = Weg; Kabelwege (Prüfkörper) ausgeblendet. Nummer = Eintrag in der Legende." % ("300,250,300 (auto)" if explode == "auto" else ",".join("%g" % v for v in explode)))
+    if a.room and explode:
+        caption.append("Hinweis: --room wird bei --explode nicht gezeichnet.")
+    job = {"parts": [{"path": p["path"], "name": p["name"], "mat": p.get("mat") or cs.default_material(p["name"])} for p in parts],
+           "out": out, "px": a.px or 1600, "aspect": aspect, "dir": dirv, "lens": a.lens, "at": at, "size": a.size,
+           "room": bool(a.room), "room_cfg": {"wall_y": wall_y, "sofa": sofa}, "explode": explode, "section": sec,
+           "samples": a.samples, "engine": a.engine, "bg": a.bg, "hide": hide, "numbers": bool(explode or a.numbers), "dims": a.dims,
+           "no_legend": a.no_legend, "caption": caption, "glb": glb, "no_render": glb_only}
+    res = cs.run_job(job, timeout=a.timeout)
+    if not res.get("ok"):
+        if quiet:
+            return {"ok": False, "text": "cad: Render fehlgeschlagen: %s" % res.get("error")}, 3
+        fail("Render fehlgeschlagen: %s" % str(res.get("error")).strip(), 3)
+    if glb_only:
+        g = res["glb"]
+        res["text"] = "GLB: %s (%.2f MB, %d Meshes, Meter, Y oben; %.1fs gesamt)" % (g["path"], g["bytes"] / 1e6, g["objects"], res["seconds"])
+    else:
+        res["text"] = cr.legend_text(res)
+        td = res.get("time_detail", {})
+        res["text"] += "\n  Zeiten: gesamt %.1fs, Blender %.1fs (Texturen %.1fs, Render %.1fs, Nummernpass %.1fs)" % (
+            res["seconds"], res.get("blender_seconds", 0), td.get("textures", 0), td.get("render", 0), td.get("idpass", 0))
+        for w in res.get("warnings") or []:
+            res["text"] += "\n  WARNUNG: " + w
+        if res.get("glb"):
+            g = res["glb"]
+            res["text"] += "\n  GLB: %s (%.2f MB, %d Meshes, %.1fs)" % (g["path"], g["bytes"] / 1e6, g["objects"], g["seconds"])
+    return res, 0
+
+
+def cmd_look(a):
+    res, code = do_look(a)
+    if a.json:
+        print(json.dumps(res, indent=1))
+    else:
+        print(res["text"])
+    sys.exit(code)
+
+
+# ------------------------------------------------------------------------------------------------ hotspots / check
+SEV_MARK = {"hoch": "HOCH   ", "mittel": "mittel ", "niedrig": "niedrig", "info": "info   "}
+
+
+def _src_arg(a):
+    if a.file:
+        p = os.path.abspath(a.file)
+        if not os.path.isfile(p):
+            fail("Datei nicht gefunden: %s" % a.file, 2)
+        return p
+    return None
+
+
+def cmd_hotspots(a):
+    p = _src_arg(a)
+    try:
+        r = call({"op": "hotspots", "file": p, "cwd": os.getcwd(), "min_wall": a.min_wall, "profile": a.profile}, a.timeout)
+    except Infra as e:
+        fail(str(e), 3)
+    if r.get("error"):
+        fail(r["error"].splitlines()[0], 2)
+    hs, sc = r["hotspots"], r["scene"]
+    code = 1 if any(h["severity"] in ("hoch", "mittel") for h in hs) else 0
+    if a.json:
+        res = {"source": sc["source"], "scene": sc, "min_wall": a.min_wall, "profile": a.profile, "hint": r.get("hint"), "hotspots": hs, "exit": code}
+        mf = save_messung("hotspots_%s.json" % (os.path.splitext(os.path.basename(p))[0] if p else "lauf"), res)
+        if mf:
+            print("[cad] Messwerte: %s" % mf, file=sys.stderr)
+        print(json.dumps(res, indent=1))
+        sys.exit(code)
+    lim = "Wand %.2f mm" % a.min_wall + (", Überhang 45°, Brücke 10 mm" if a.profile == "print" else "; Profil moebel: ohne Brücke/Überhang")
+    print("cad hotspots %s: %d Treffer (%d Dreiecke, %d Teil(e), Analyse %.1fs; Grenzen: %s)" % (
+        os.path.basename(p) if p else "(letzter Lauf)", len(hs), sc["triangles"], sc["parts"], r["analysis_seconds"] + sc["build_seconds"], lim))
+    for h in hs[:a.max]:
+        b = h["box"]
+        print("%2d [%s] %s | bei (%.1f, %.1f, %.1f) Box x %.1f..%.1f y %.1f..%.1f z %.1f..%.1f%s" % (
+            h["n"], SEV_MARK[h["severity"]].strip(), h["reason"], *h["center"], b[0], b[3], b[1], b[4], b[2], b[5],
+            " | Teil %s" % ", ".join(h["part_names"]) if h.get("part_names") and sc["parts"] > 1 else ""))
+    if len(hs) > a.max:
+        print("  ... %d weitere (--max oder --json)" % (len(hs) - a.max))
+    if r.get("hint"):
+        print(r["hint"])
+    if hs:
+        print("Ansehen: cad look %s--hotspot N%s" % (p + " " if p else "", " --profile moebel" if a.profile == "moebel" else ""))
+    sys.exit(code)
+
+
+def _line_specs(a):
+    import linienwand as LW
+    try:
+        return LW, [(x.strip(), LW.parse_lw(x)) for x in a.line_w.split(",") if x.strip()]
+    except ValueError:
+        fail("--line-w erwartet Linienbreiten, z. B. 0.6 oder 0.42/0.45 (außen/innen) oder std, mehrere mit Komma", 2)
+
+
+def group_walls(walls, tol=0.025):
+    """Wandstuecke gleicher Dicke (+/- tol) und gleichen Teils zu einer Zeile: Flaeche summiert, Ort = groesstes Stueck."""
+    groups = []
+    for w in sorted(walls, key=lambda w: w["t"]):
+        key = tuple(w.get("part_names") or [])
+        g = next((g for g in groups if g["key"] == key and abs(w["t"] - g["t_last"]) <= tol), None)
+        if g is None:
+            g = {"key": key, "items": [], "t_last": w["t"]}
+            groups.append(g)
+        g["items"].append(w); g["t_last"] = w["t"]
+    out = []
+    for g in groups:
+        it = g["items"]; big = max(it, key=lambda w: w["area"]); A = sum(w["area"] for w in it)
+        t = sum(w["t"] * w["area"] for w in it) / A if A else big["t"]
+        axes = sorted(set(w["axis"] for w in it))
+        out.append({"t": round(t, 3), "t_min": min(w["t_min"] for w in it), "t_max": max(w["t_max"] for w in it), "area": A, "n": len(it),
+                    "center": big["center"], "axis": "/".join(axes), "part_names": list(g["key"])})
+    out.sort(key=lambda w: -w["area"])
+    return out
+
+
+def print_line_table(a, walls):
+    """Tabelle `cad check --line-w`: je Wand Dicke, Spuren, Rest, Urteil je Linienbreite (Modell linienwand.py)."""
+    LW, specs = _line_specs(a)
+    h, loops = a.layer_h, a.loops
+    print("Wandstärke vs. Linienbreite (OrcaSlicer classic, Wandlinien %d, Schicht %.2f; Modell kalibriert an Slicer-Schätzung, nicht gedruckt):" % (loops, h))
+    for name, (wo, wi) in specs:
+        fen = ", ".join("%.2f–%.2f (%d Sp.)" % (max(lo, 1.4 * wo if n == 2 else lo), hi - (0.07 if n == 2 else 0.015), n) for lo, hi, n in LW.fenster(wo, wi, h, loops))
+        print("  Linien %s (außen %.2f / innen %.2f, Spurabstand %.3f): gap-frei bei %s mm" % (name, wo, wi, LW.spacing(wi, h), fen))
+    if walls is None:
+        return 0
+    if not walls:
+        print("  keine senkrechten Wände bis %.1f mm Dicke gefunden" % a.t_max)
+        return 0
+    if not a.stellen:
+        walls = group_walls(walls)
+    hdr = "%3s %6s %8s %6s  %-24s %-3s" % ("Nr", "Dicke", "Fläche", "Stellen", "Ort (x, y, z) mm (größte)", "N")
+    for name, _ in specs:
+        hdr += " | %-44s" % ("Linien " + name + ": Spuren, Rest, Urteil")
+    print(hdr)
+    n_hint = 0
+    for i, w in enumerate(walls[:a.max], 1):
+        tt = w["t"]
+        rng = "" if w["t_max"] - w["t_min"] < 0.03 else " (%.2f–%.2f)" % (w["t_min"], w["t_max"])
+        line = "%3d %6.2f %6.0fmm² %6d  (%6.1f,%6.1f,%6.1f)     %-3s" % (i, tt, w["area"], w.get("n", 1), *w["center"], w["axis"])
+        for name, (wo, wi) in specs:
+            m = LW.spuren(tt, wo, wi, h, loops)
+            nom_n = max(1, round(tt / wo))
+            cell = "%s: %s; Rest %+.2f (nominal %d×%.2f %+.2f)" % (m["urteil"], m["text"], m["rest"], nom_n, wo, tt - nom_n * wo)
+            if m["urteil"] != "ok":
+                n_hint += 1
+                if "erschöpft" in m["text"] and LW.spuren(tt, wo, wi, h, loops + 1)["urteil"] == "ok":
+                    cell += " -> ok mit --loops %d" % (loops + 1)
+                ns = LW.naechste_saubere(tt, wo, wi, h, loops)
+                if ns is not None:
+                    cell += " -> sauber z. B. %.2f" % ns
+            line += " | " + cell
+        print(line + rng + (" | Teil %s" % ", ".join(w["part_names"]) if w.get("part_names") else ""))
+    if len(walls) > a.max:
+        print("  ... %d weitere Wände (--max)" % (len(walls) - a.max))
+    print("  Urteil ok = Rest <= 0,015 mm (2 Außenspuren: <= 0,07); darüber Gap-Fill über die ganze Wandhöhe. Rest = Dicke - 2 x Kante der innersten Spur;"
+          " 'nominal' = Dicke - n x Linienbreite nur zur Info (classic legt Spuren paarweise von beiden Seiten).")
+    return n_hint
+
+
+def cmd_check(a):
+    if a.line_w and a.wand:
+        LW, specs = _line_specs(a)
+        try:
+            ts = [float(x.replace(",", ".")) for x in a.wand.split(";") if x] if ";" in a.wand else [float(x) for x in a.wand.split(",")]
+        except ValueError:
+            fail("--wand erwartet Dicken in mm, z. B. 1.6,1.8", 2)
+        walls = [{"t": t, "t_min": t, "t_max": t, "area": 0, "center": [0, 0, 0], "axis": "-"} for t in ts]
+        print("cad check --wand (nur Rechner, kein Modell)")
+        print_line_table(a, walls)
+        sys.exit(0)
+    p = _src_arg(a)
+    if not p and a.file is None:
+        pass
+    try:
+        bed = [float(x) for x in a.bed.lower().replace("x", ",").split(",")]
+        if len(bed) != 3:
+            raise ValueError
+    except ValueError:
+        fail("--bed erwartet BxTxH, z. B. 256x256x256", 2)
+    try:
+        r = call({"op": "check", "file": p, "cwd": os.getcwd(), "bed": bed, "min_wall": a.min_wall, "profile": a.profile,
+                  "line_walls": bool(a.line_w), "t_max": a.t_max}, a.timeout)
+    except Infra as e:
+        fail(str(e), 3)
+    if r.get("error"):
+        fail(r["error"].splitlines()[0], 2)
+    if a.json:
+        mf = save_messung("check_%s.json" % (os.path.splitext(os.path.basename(p))[0] if p else "lauf"), r)
+        if mf:
+            print("[cad] Messwerte: %s" % mf, file=sys.stderr)
+        print(json.dumps(r, indent=1))
+        sys.exit(r["exit"])
+    print("cad check %s (Bett %gx%gx%g%s): %s" % (os.path.basename(p) if p else "(letzter Lauf)", *bed, ", Profil moebel" if a.profile == "moebel" else "", "BEFUND" if r["exit"] else "ok"))
+    for it in r["items"]:
+        print("  %-4s %-12s %s" % (it["status"], it["check"], it["text"]))
+    if r.get("hint"):
+        print("  " + r["hint"])
+    if r["exit"]:
+        print("  Details und Stellen: cad hotspots %s%s" % (p or "", " --profile moebel" if a.profile == "moebel" else ""))
+    if a.line_w:
+        print()
+        print_line_table(a, r.get("line_walls", []))
+    sys.exit(r["exit"])
+
+
+# ------------------------------------------------------------------------------------------------ worker
+def cmd_worker(a):
+    if a.action == "status":
+        s = status()
+        if a.json:
+            print(json.dumps(s or {"ok": False, "state": "off"}))
+        elif s:
+            print("worker laeuft (pid %d, FreeCAD %s): %s%s, Laeufe %d, Leerlauf %ds von %ds, Warteschlange %d" % (
+                s["pid"], s["freecad"], s["state"], " (%s seit %.0fs)" % (s["script"], s["busy_seconds"]) if s["script"] else "",
+                s["runs"], s["idle_seconds"], s["idle_limit"], s["queued"]))
+        else:
+            print("worker aus (startet bei `cad run` von selbst)")
+        sys.exit(0)
+    if a.action == "stop":
+        subprocess.run(["systemctl", "--user", "stop", "cadworker.service"], check=False)
+        print("worker gestoppt")
+        sys.exit(0)
+    if a.action == "restart":
+        subprocess.run(["systemctl", "--user", "restart", "cadworker.service"], check=False)
+        try:
+            for _ in range(150):
+                s = status()
+                if s:
+                    print("worker neu gestartet (pid %d)" % s["pid"])
+                    sys.exit(0)
+                time.sleep(0.2)
+        except KeyboardInterrupt:
+            pass
+        fail("Worker startet nicht (journalctl --user -u cadworker -n 20)", 3)
+
+
+def cmd_materials(a):
+    import cad_schoen as cs
+    cur = {k: dict(v) for k, v in cs.USER_MATERIALS.items()}
+    if a.action == "list":
+        print("Eingebaut (mit Textur): eiche, multiplex, hartholz; platzhalter (blau)")
+        for k, m in cur.items():
+            print("%-12s %-22s rgb=%s rough=%s metal=%s aliases=%s match=%s" % (k, m.get("label", k), m["rgb"], m.get("rough", 0.5), m.get("metal", 0), m.get("aliases", []), m.get("match", "-")))
+        if not cur:
+            print("(keine eigenen Materialien; Datei: %s)" % cs.MATERIALS_FILE)
+        return
+    if not a.key:
+        fail("cad materials %s: Schluessel fehlt" % a.action, 2)
+    k = a.key.strip().lower()
+    if a.action == "rm":
+        if k not in cur:
+            fail("unbekanntes Material %r" % k, 2)
+        del cur[k]
+        cs.save_user_materials(cur)
+        print("entfernt:", k)
+        return
+    if not a.rgb:
+        fail("cad materials add: --rgb fehlt (z.B. --rgb 0.3,0.55,0.62)", 2)
+    if k in ("eiche", "multiplex", "hartholz", "platzhalter"):
+        fail("%r ist eingebaut" % k, 2)
+    rgb = [float(x) for x in a.rgb.split(",")]
+    if len(rgb) != 3 or not all(0 <= x <= 1 for x in rgb):
+        fail("--rgb: drei Werte 0..1", 2)
+    cur[k] = {"label": a.label or k, "rgb": rgb, "rough": a.rough, "metal": a.metal,
+              "aliases": [x.strip() for x in (a.alias or "").split(",") if x.strip()]}
+    if a.match:
+        cur[k]["match"] = a.match
+    cs.save_user_materials(cur)
+    print("gespeichert:", k, "->", cs.MATERIALS_FILE)
+
+
+# ------------------------------------------------------------------------------------------------ projekt / version / freigabe
+def cmd_projekt(a):
+    try:
+        if a.name in (None, "show"):
+            info = cp.projekt_show(a.extra)
+            if a.json:
+                print(json.dumps(info, indent=1, ensure_ascii=False)); return
+            st = cp.load_state()
+            print("Projekt %s (%s)%s, aktuell -> %s" % (info["projekt"], info["pfad"], "  [aktiv]" if st.get("projekt") == info["projekt"] else "", info["aktuell"] or "-"))
+            for r in info["versionen"]:
+                print("  %s %-45s %3d Dateien%s" % ("*" if r["aktiv"] else " ", r["version"], r["dateien"], "  FREIGEGEBEN" if r["freigabe"] else ""))
+            if info["experimente"]:
+                print("  experimente/: " + ", ".join(info["experimente"]))
+            return
+        if a.name == "list":
+            st = cp.load_state()
+            rows = cp.projekt_list()
+            if a.json:
+                print(json.dumps({"aktiv": st, "projekte": rows}, indent=1, ensure_ascii=False)); return
+            for r in rows:
+                print("%s %-22s %2d Versionen, neueste %s" % ("*" if st.get("projekt") == r["projekt"] else " ", r["projekt"], r["versionen"], r["neueste"] or "-"))
+            if not rows:
+                print("(keine Projekte mit PROJEKT.md unter %s)" % cp.ROOT)
+            return
+        if a.name == "aus":
+            cp.clear()
+            print("kein aktives Projekt mehr (Ausgaben wieder nach %s, mit Warnung)" % cp.FALLBACK)
+            return
+        d, neu, made, v = cp.set_projekt(a.name)
+        print("aktives Projekt: %s (%s)%s" % (a.name, d, " - neu angelegt" if neu else ""))
+        if made:
+            print("  angelegt: %s (bitte Zweck/Vorgaben eintragen)" % ", ".join(made))
+        print("  aktive Version: %s" % (v or "keine - erst cad version \"<Label>\""))
+    except cp.Fehler as e:
+        fail(str(e), 2)
+
+
+def cmd_version(a):
+    try:
+        if a.nutze:
+            p, v = cp.set_version(a.nutze)
+            print("aktive Version: %s/%s (aktuell bleibt unveraendert)" % (p, v))
+            return
+        if not a.label:
+            p, v, vdir = cp.active()
+            if not p:
+                fail(cp.WARN_FALLBACK, 2)
+            print("%s/%s%s" % (p, v or "(keine Version)", "  FREIGEGEBEN" if cp.is_frozen(vdir) else ""))
+            if vdir:
+                print(vdir)
+            return
+        p, v, vdir, basis, link_err = cp.new_version(a.label, a.basiert_auf)
+        print("neue Version: %s/%s%s" % (p, v, " (basiert auf %s)" % basis if basis else ""))
+        print("  %s/{%s}" % (vdir, ",".join(cp.KINDS)))
+        print("  %s, CHANGELOG.md ergaenzt; Ausgaben von cad look/run gehen jetzt dorthin" % ("aktuell -> " + v if not link_err else "aktuell NICHT gesetzt"))
+        if link_err:
+            print("[cad] WARNUNG: " + link_err, file=sys.stderr)
+    except cp.Fehler as e:
+        fail(str(e), 2)
+
+
+def cmd_freigabe(a):
+    try:
+        p, v, f = cp.freigabe(a.notiz)
+    except cp.Fehler as e:
+        fail(str(e), 2)
+    print("freigegeben: %s/%s -> %s (Version ist jetzt gesperrt; Aenderungen = cad version)" % (p, v, f))
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="cad", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd")
+    r = sub.add_parser("run", help="Skript im Worker ausfuehren")
+    r.add_argument("script", nargs="?"); r.add_argument("-c", dest="code"); r.add_argument("-k", "--keep", action="store_true", help="Dokumente und Namespace behalten")
+    r.add_argument("--report", action="store_true", help="Messwerte der Objekte dieses Laufs")
+    r.add_argument("--look", nargs="?", const="sheet", help="danach Bild: sheet (Standard) oder eine Ansicht")
+    r.add_argument("--glb", metavar="out.glb", help="danach GLB exportieren (Meter, Y oben, Teile als benannte Meshes, PBR-Materialien)")
+    r.add_argument("-v", "--verbose", action="store_true", help="Traceback bei Fehlern"); r.add_argument("--json", action="store_true")
+    r.add_argument("--timeout", type=int, default=900)
+    i = sub.add_parser("info", help="Messwerte einer FCStd/STEP/STL-Datei")
+    i.add_argument("file"); i.add_argument("--json", action="store_true"); i.add_argument("--timeout", type=int, default=300)
+    sub.add_parser("look", add_help=False, help="Bild(er) mit Lineal (cad look -h)")
+    w = sub.add_parser("worker", help="Worker steuern")
+    w.add_argument("action", choices=["status", "stop", "restart"]); w.add_argument("--json", action="store_true")
+    hp = sub.add_parser("hotspots", help="kritische Stellen (Ueberhang, duenne Wand, Spalt, offenes Netz, Fokus) nummeriert")
+    hp.add_argument("file", nargs="?", help="Datei; ohne Angabe: letzter Lauf")
+    hp.add_argument("--min-wall", type=float, default=0.8, help="Grenze duenne Wand in mm (Standard 0.8)")
+    hp.add_argument("--profile", choices=["print", "moebel"], default="print", help="print (Standard, Druckteile) | moebel: Bruecke/Ueberhang/Bett ausblenden (Bauteile ohne Druckbezug)")
+    hp.add_argument("--max", type=int, default=30, help="hoechstens so viele Zeilen (Standard 30)")
+    hp.add_argument("--json", action="store_true"); hp.add_argument("--timeout", type=int, default=300)
+    mp = sub.add_parser("materials", help="Materialbibliothek fuer --style schoen (materials.json): list | add | rm")
+    mp.add_argument("action", choices=["list", "add", "rm"]); mp.add_argument("key", nargs="?")
+    mp.add_argument("--rgb", help="sRGB 0..1, z.B. 0.30,0.55,0.62"); mp.add_argument("--label"); mp.add_argument("--rough", type=float, default=0.5)
+    mp.add_argument("--metal", type=float, default=0.0); mp.add_argument("--alias", help="weitere Namen, kommagetrennt")
+    mp.add_argument("--match", help="Regex auf den Teilenamen: passende Teile bekommen das Material automatisch")
+    ck = sub.add_parser("check", help="Druckbarkeit: Exit 0 ok, 1 Befund")
+    ck.add_argument("file", nargs="?", help="Datei; ohne Angabe: letzter Lauf")
+    ck.add_argument("--bed", default="256x256x256", help="Bettgroesse BxTxH in mm (Standard 256x256x256)")
+    ck.add_argument("--min-wall", type=float, default=0.8)
+    ck.add_argument("--profile", choices=["print", "moebel"], default="print", help="print (Standard, Druckteile) | moebel: Bruecke/Ueberhang/Bett ausblenden (Bauteile ohne Druckbezug)")
+    ck.add_argument("--line-w", help="Wandstärke vs. Linienbreite prüfen: 0.6 | 0.42/0.45 (außen/innen) | std, mehrere mit Komma (z. B. std,0.6)")
+    ck.add_argument("--loops", type=int, default=2, help="Wandlinien je Seite wie im Slicer (Orca-Profil 2)")
+    ck.add_argument("--layer-h", type=float, default=0.2, help="Schichthöhe für den Spurabstand (Standard 0.2)")
+    ck.add_argument("--t-max", type=float, default=4.0, help="Wände bis zu dieser Dicke prüfen (Standard 4 mm)")
+    ck.add_argument("--wand", help="nur Rechner ohne Modell: Dicken in mm, z. B. --wand 1.6,1.8,2.4")
+    ck.add_argument("--max", type=int, default=25, help="höchstens so viele Wände (größte Fläche zuerst)")
+    ck.add_argument("--stellen", action="store_true", help="jede Wandstelle einzeln statt nach Dicke und Teil zusammengefasst")
+    ck.add_argument("--json", action="store_true"); ck.add_argument("--timeout", type=int, default=300)
+    pj = sub.add_parser("projekt", help="aktives Projekt: cad projekt <name> | list | show [name] | aus")
+    pj.add_argument("name", nargs="?"); pj.add_argument("extra", nargs="?"); pj.add_argument("--json", action="store_true")
+    vp = sub.add_parser("version", help="cad version \"<Label>\" [--basiert-auf vNNN] | --nutze vNNN")
+    vp.add_argument("label", nargs="?"); vp.add_argument("--basiert-auf", dest="basiert_auf")
+    vp.add_argument("--nutze", help="vorhandene Version aktiv machen (z. B. v002)")
+    fg = sub.add_parser("freigabe", help="freigabe.md schreiben (nur auf ausdruecklichen Wunsch des Nutzers), sperrt die Version")
+    fg.add_argument("notiz")
+    argv = sys.argv[1:]
+    if argv and argv[0] == "look":
+        cmd_look(look_parser().parse_args(argv[1:]))
+    if argv and argv[0] == "run" and "--" in argv:
+        k = argv.index("--")
+        argv, extra = argv[:k], argv[k + 1:]
+    else:
+        extra = []
+    a = ap.parse_args(argv)
+    if a.cmd == "run":
+        a.args = extra
+        cmd_run(a)
+    elif a.cmd == "info":
+        cmd_info(a)
+    elif a.cmd == "worker":
+        cmd_worker(a)
+    elif a.cmd == "hotspots":
+        cmd_hotspots(a)
+    elif a.cmd == "check":
+        cmd_check(a)
+    elif a.cmd == "materials":
+        cmd_materials(a)
+    elif a.cmd == "projekt":
+        cmd_projekt(a)
+    elif a.cmd == "version":
+        cmd_version(a)
+    elif a.cmd == "freigabe":
+        cmd_freigabe(a)
+    else:
+        print(__doc__)
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.exit(130)
