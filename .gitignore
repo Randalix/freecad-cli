@@ -14,3 +14,17 @@ freecad_rpc_start.py
 docs/
 sync.sh
 systemd/freecad-*
+# lokale Einmalskripte und Beispiele, nicht im Repo
+bench/profile_bridge_cprofile.py
+bench/profile_bridge_lines.py
+bench/profile_bridge_new.py
+bench/profile_bridge_span.py
+bench/profile_hotspots_stages.py
+bench/compare_bridge_old_new.py
+bench/two_boxes.py
+bench/two_boxes_report.py
+bench/assess_focus.py
+bench/focus_enclosed.py
+bench/fit_all_pairs.py
+gridfinity_tempo.py
+gridfinity_tuecher.py
