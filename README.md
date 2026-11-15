@@ -87,6 +87,9 @@ Hinweis: Einige Standardwerte im Code zeigen noch auf das Layout des Autors (`/m
 | `cadprojekt.py` | Projektstruktur |
 | `materials.json` | eigene Materialien für den Schön-Stil (`cad materials …`) |
 | `gridfinity_*.py` | Beispielmodelle (Gridfinity-Behälter) |
+| `plant_pot/` | Square Pot (Topf + Reservoir + Dochtkorb): Modell `plant_pot.py` mit Sicherheitsregeln, Prüfskripte (Drehweg, Gießstellung, Spiel, Absetzen) |
+| `stl_facetten.py` | Prüfung: sichtbare Facetten in STLs (zu grobe Vernetzung von Rundungen), CLI und Funktion, ohne numpy |
+| `gcode_schichten.py` | Analyse: Schichtzeit, Außenwand-Vorschub, Lüfter und Bahnarten je Schicht, markiert Zeitsprünge |
 | `bench/`, `cad_selftest.py` | Regression, Zeitmessung, Referenzen |
 | `research/` | Recherche-Notizen (CLI statt MCP, Snap-Fit) |
 | `cadconf.py`, `cad.env.example` | Konfigurationsdatei `~/.config/cad/env` |
