@@ -2,9 +2,9 @@
   "pla": {
     "label": "PLA (3D-Druck)",
     "rgb": [
-      0.3,
-      0.55,
-      0.62
+      0.78,
+      0.78,
+      0.76
     ],
     "rough": 0.45,
     "metal": 0.0,
@@ -12,7 +12,9 @@
       "petg",
       "kunststoff"
     ],
-    "match": "^(bin|lid|deckel|box|halter|schublade|fuss|kotbeutel|tempo|tuech)"
+    "match": "^(bin|lid|deckel|box|halter|schublade|fuss|kotbeutel|tempo|tuech)",
+    "layer": 0.2,
+    "bump": 4.0
   },
   "pla_schwarz": {
     "label": "PLA schwarz (3D-Druck)",
@@ -26,6 +28,7 @@
     "aliases": [
       "pla_black",
       "schwarz"
-    ]
+    ],
+    "layer": 0.2
   }
 }

@@ -732,6 +732,11 @@ def do_schoen(a, quiet=False, glb_only=False):
         caption.append("Explosionsansicht: Teile entlang ihrer Montagerichtung auseinandergezogen (Abstände %s mm in x, y, z); gestrichelt = Weg; Kabelwege (Prüfkörper) ausgeblendet. Nummer = Eintrag in der Legende." % ("300,250,300 (auto)" if explode == "auto" else ",".join("%g" % v for v in explode)))
     if a.room and explode:
         caption.append("Hinweis: --room wird bei --explode nicht gezeichnet.")
+    _grau = [p["name"] for p in parts if (p.get("mat") or cs.default_material(p["name"])) == "grau"]
+    if _grau:
+        _w = "WARNUNG: kein Material vergeben für %s -> grau gerendert. Material setzen: cad.material(\"Name\", \"pla\") im Skript (eigene Materialien: cad materials list)." % ", ".join(_grau[:6] + (["…"] if len(_grau) > 6 else []))
+        caption.append(_w)
+        print(_w, file=sys.stderr)
     job = {"parts": [{"path": p["path"], "name": p["name"], "mat": p.get("mat") or cs.default_material(p["name"])} for p in parts],
            "out": out, "px": a.px or 1600, "aspect": aspect, "dir": dirv, "lens": a.lens, "at": at, "size": a.size,
            "room": bool(a.room), "room_cfg": {"wall_y": wall_y, "sofa": sofa}, "explode": explode, "section": sec,

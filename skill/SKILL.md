@@ -48,7 +48,7 @@ Bevor ein Modell oder eine Änderung als fertig gemeldet wird, muss der Nutzer d
 - Das Bild nach der letzten Änderung neu rendern und selbst ansehen; nie ein altes Bild wiederverwenden. Im Bericht sagen, welcher Stand gerendert wurde.
 
 ## Stil `schoen` und GLB
-Perspektive mit Materialien, Schatten, Bemaßung (`--dims`: Länge/Breite/Höhe der Bounding Box der sichtbaren Teile), Schnitt (`--section`), Explosion (`--explode`, mit Nummern und Legende), Raum-Kulisse (`--room`) und GLB-Export (Meter, Y oben, Teile als benannte Meshes, PBR). Material je Bauteil: im Skript `cad.material("Name", "eiche|multiplex|hartholz|platzhalter|<eigene>")` oder Namensregel; eigene Materialien (`materials.json`) mit `cad materials add`.
+Perspektive mit Materialien, Schatten, Bemaßung (`--dims`: Länge/Breite/Höhe der Bounding Box der sichtbaren Teile), Schnitt (`--section`), Explosion (`--explode`, mit Nummern und Legende), Raum-Kulisse (`--room`) und GLB-Export (Meter, Y oben, Teile als benannte Meshes, PBR). Material je Bauteil: im Skript `cad.material("Name", "eiche|multiplex|hartholz|platzhalter|<eigene>")` oder Namensregel (ohne Treffer: neutrales Grau mit Warnung „kein Material vergeben“); eigene Materialien (`materials.json`) mit `cad materials add`.
 
 ## Bekannte Fallen
 - FreeCAD headless: `freecad -c` braucht `</dev/null`; `App` ist im Skript ohne Import verfügbar; nie `PySide`/`pivy` importieren; ohne `DISPLAY` stürzt VTK ab.

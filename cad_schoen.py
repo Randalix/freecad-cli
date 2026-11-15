@@ -23,10 +23,11 @@ MATERIALS = {
     "multiplex": {"label": "Multiplex (Birke)", "rgb": (0.84, 0.70, 0.48)},
     "hartholz": {"label": "Hartholz", "rgb": (0.40, 0.24, 0.12)},
     "platzhalter": {"label": "Platzhalter (kein Möbelteil)", "rgb": (0.42, 0.58, 0.76)},
+    "grau": {"label": "Grau (KEIN MATERIAL VERGEBEN)", "rgb": (0.55, 0.55, 0.55)},
 }
 CABLE_RGB = (0.95, 0.45, 0.10)
 ALIASES = {"eiche": "eiche", "multiplex": "multiplex", "birke": "multiplex", "sperrholz": "multiplex", "hartholz": "hartholz",
-           "buche": "hartholz", "platzhalter": "platzhalter", "placeholder": "platzhalter"}
+           "buche": "hartholz", "platzhalter": "platzhalter", "placeholder": "platzhalter", "grau": "grau", "grey": "grau", "gray": "grau"}
 
 
 # Eigene Materialien: materials.json neben diesem Skript (Verwaltung: cad materials list|add|rm). Einmal angelegt, fuer alle Modelle nutzbar.
@@ -43,7 +44,7 @@ def load_user_materials():
         data = {}
     for k, m in data.items():
         k = k.strip().lower()
-        if k in ("eiche", "multiplex", "hartholz", "platzhalter"):
+        if k in ("eiche", "multiplex", "hartholz", "platzhalter", "grau"):
             continue
         USER_MATERIALS[k] = m
         MATERIALS[k] = {"label": m.get("label", k), "rgb": tuple(m["rgb"])}
@@ -65,12 +66,16 @@ def norm_material(m):
     """'Eiche', 'multiplex', ... -> Schluessel; unbekannt -> ValueError."""
     k = ALIASES.get(str(m).strip().lower())
     if not k:
-        raise ValueError("unbekanntes Material %r (eiche, multiplex, hartholz, platzhalter)" % (m,))
+        load_user_materials()      # materials.json koennte seit dem Worker-Start ergaenzt worden sein
+        k = ALIASES.get(str(m).strip().lower())
+    if not k:
+        raise ValueError("unbekanntes Material %r (eiche, multiplex, hartholz, platzhalter, grau, eigene: cad materials list)" % (m,))
     return k
 
 
 def default_material(name):
-    """Fallback aus dem Teilenamen: Eiche -> eiche, *Platzhalter*/Kabelweg*/Laptop -> platzhalter, Rest -> multiplex."""
+    """Fallback aus dem Teilenamen: Eiche -> eiche, *Platzhalter*/Kabelweg*/Laptop -> platzhalter, passende eigene
+    Materialien (materials.json: match), Rest -> grau (neutral, mit Warnung des Aufrufers: kein Material vergeben)."""
     n = str(name).lower()
     if "eiche" in n:
         return "eiche"
@@ -81,7 +86,7 @@ def default_material(name):
         return "platzhalter"
     if "hartholz" in n:
         return "hartholz"
-    return "multiplex"
+    return "grau"
 
 
 def is_cable(name):
@@ -414,6 +419,33 @@ class MatBook:
         self.cache[mk] = m
         return m
 
+    def printed(self, key, rgb, rough, layer, bump=0.6, metal=0.0):
+        """3D-Druck-Material: Schichtlinien als Bump aus der Welt-Z (Modelle stehen mit Z=0 auf dem Druckbett).
+        Profil je Schicht: Parabel (glatt, kein Aliasing-Knick), Hoehe ~ 25 % der Schichthoehe."""
+        mk = ("printed", key)
+        if mk in self.cache:
+            return self.cache[mk]
+        m, nt, bsdf = self._new(key)
+        N, Lk = nt.nodes.new, nt.links.new
+        bsdf.inputs["Base Color"].default_value = (*rgb, 1.0)
+        bsdf.inputs["Roughness"].default_value = rough
+        bsdf.inputs["Metallic"].default_value = metal
+        geo = N("ShaderNodeNewGeometry")
+        sep2 = N("ShaderNodeSeparateXYZ")
+        Lk(geo.outputs["Position"], sep2.inputs[0])
+        d = N("ShaderNodeMath"); d.operation = "DIVIDE"; d.inputs[1].default_value = layer; Lk(sep2.outputs["Z"], d.inputs[0])
+        f = N("ShaderNodeMath"); f.operation = "FRACT"; Lk(d.outputs[0], f.inputs[0])
+        t = N("ShaderNodeMath"); t.operation = "MULTIPLY_ADD"; t.inputs[1].default_value = 2.0; t.inputs[2].default_value = -1.0; Lk(f.outputs[0], t.inputs[0])
+        q = N("ShaderNodeMath"); q.operation = "POWER"; q.inputs[1].default_value = 2.0; Lk(t.outputs[0], q.inputs[0])
+        h = N("ShaderNodeMath"); h.operation = "SUBTRACT"; h.inputs[0].default_value = 1.0; Lk(q.outputs[0], h.inputs[1])
+        b = N("ShaderNodeBump")
+        b.inputs["Strength"].default_value = bump
+        b.inputs["Distance"].default_value = layer * 0.25
+        Lk(h.outputs[0], b.inputs["Height"])
+        Lk(b.outputs["Normal"], bsdf.inputs["Normal"])
+        self.cache[mk] = m
+        return m
+
     def part_slots(self, key, name):
         """Materialliste (Slots) eines Teils nach Materialschluessel."""
         if key == "eiche":
@@ -422,8 +454,13 @@ class MatBook:
             return [self.textured("hartholz", "Hartholz", 0.5)], "wood"
         if key == "multiplex":
             return [self.textured("ply_face", "Multiplex", 0.5, bump=False), self.textured("ply_edge", "Multiplex_Kante", 0.6, bump=False)], "ply"
+        if key == "grau":
+            return [self.solid("Grau_ohne_Material", _srgb_to_lin(MATERIALS["grau"]["rgb"]), 0.6)], None
         if key in USER_MATERIALS:
             m = USER_MATERIALS[key]
+            if m.get("layer"):
+                return [self.printed(key, _srgb_to_lin(tuple(m["rgb"])), float(m.get("rough", 0.5)), float(m["layer"]),
+                                     float(m.get("bump", 0.6)), float(m.get("metal", 0.0)))], None
             return [self.solid(key, _srgb_to_lin(tuple(m["rgb"])), float(m.get("rough", 0.5)), metal=float(m.get("metal", 0.0)))], None
         if is_cable(name):
             if re.search(r"(Schacht|Plattendurchlass|Durchlass)", name):       # Freihalteraeume: durchscheinend

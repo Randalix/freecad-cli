@@ -87,7 +87,7 @@ def report(*shapes, **named):
 def material(name, mat):
     """Material eines Teils fuer `cad look --style schoen` und GLB: cad.material("Eichenplatte", "eiche").
     mat: eiche | multiplex | hartholz | platzhalter. Ohne Angabe gilt ein Fallback aus dem Teilenamen
-    (Eiche -> eiche; *Platzhalter*, Kabelweg*, Laptop -> platzhalter; Rest -> multiplex). Auch: cad.report(Name=(shape, "eiche"))."""
+    (Eiche -> eiche; *Platzhalter*, Kabelweg*, Laptop -> platzhalter; Rest -> grau mit Warnung, kein Material vergeben). Auch: cad.report(Name=(shape, "eiche"))."""
     import cad_schoen
     _state["mats"][str(name)] = cad_schoen.norm_material(mat)
 
