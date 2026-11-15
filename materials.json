@@ -13,5 +13,19 @@
       "kunststoff"
     ],
     "match": "^(bin|lid|deckel|box|halter|schublade|fuss|kotbeutel|tempo|tuech)"
+  },
+  "pla_schwarz": {
+    "label": "PLA schwarz (3D-Druck)",
+    "rgb": [
+      0.045,
+      0.045,
+      0.05
+    ],
+    "rough": 0.5,
+    "metal": 0.0,
+    "aliases": [
+      "pla_black",
+      "schwarz"
+    ]
   }
 }
