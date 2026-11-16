@@ -637,6 +637,10 @@ if out:
         fein_schichthoehe=0.1 if LIFT else None,
         fein_topf=[0.0, round(_fein_topf, 2)] if LIFT and FEIN_TOPF else None,           # Druckhöhe Topf: V-Nut + Zahnspitzen
         fein_reservoir=[round(SPLIT, 2), round(_fein_res, 2)] if LIFT else None,   # Druckhöhe Reservoir: Lippe + Kurvenbahn
+        # Joe 16.11.: leichtes Fuzzy Skin auf der Außenwand. Nur die sichtbare Außenhaut (Druckhöhe): Topf ganz, Reservoir bis zur Fuge;
+        # darüber am Reservoir nur Lippe (Zentrierflanke) und Kurvenring (Spiel 0,4) -> glatt. Dochtkorb glatt (Spiel 0,3 in der Öffnung).
+        fuge_reservoir=round(SPLIT, 2),
+        fuzzy_topf=[0.0, round(HEIGHT - SPLIT, 2)], fuzzy_reservoir=[0.0, round(SPLIT, 2)], fuzzy_dochtkorb=None,
         hinweis="Innenboden-Oberkante: darunter Lightning, darüber Grid (Joe, 15.11.); Naht back"),
         open(out + "/slicer_%s.json" % NAME, "w"), indent=1, ensure_ascii=False)
     print("STL: %s/{pot,reservoir%s}_%s.stl" % (out, ",testring_*" if TEST else "", NAME))
