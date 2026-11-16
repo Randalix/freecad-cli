@@ -64,6 +64,7 @@ CAM_CL     = P("CAM_CL", 0.4)     # radiale Luft Ring <-> Kanal im Topf
 CAM_TEETH  = P("CAM_TEETH", 4)    # Zähne im Topf (bei 0/90/180/270°, mittig über den Seiten)
 TOOTH_R    = P("TOOTH_R", 3.0)    # Joe 15.11. (Drehen ruckelt über die Layerstufen der Rampe): Zahnspitze rund, gleitet über die
                                   # Stufenkanten statt hineinzufallen (Rest-Holpern ~ Stufenlänge² / 8R). 0 = spitzes 45°-V
+FUZZY      = P("FUZZY", False)    # Fuzzy-Skin-Bereiche in die slicer_*.json schreiben (Joe 16.11.: kann weg)
 FEIN_TOPF  = P("FEIN_TOPF", False)  # Joe 16.11.: 0,1-mm-Schichten unten am Topf sieht man an der Außenwand (Schichthöhe gilt je Schicht fürs ganze Teil).
                                     # Aus: am Topf gleitet auf der Rampe immer dieselbe Stelle der runden Zahnspitze, die Stufen der Rampe (Reservoir, fein) zählen
 TOOTH_W    = P("TOOTH_W", None)   # Zahnbreite (tangential), Unterseite 45°-V mit runder Spitze (None = 6 bei rundem Zahn, sonst 4)
@@ -640,7 +641,8 @@ if out:
         # Joe 16.11.: leichtes Fuzzy Skin auf der Außenwand. Nur die sichtbare Außenhaut (Druckhöhe): Topf ganz, Reservoir bis zur Fuge;
         # darüber am Reservoir nur Lippe (Zentrierflanke) und Kurvenring (Spiel 0,4) -> glatt. Dochtkorb glatt (Spiel 0,3 in der Öffnung).
         fuge_reservoir=round(SPLIT, 2),
-        fuzzy_topf=[0.0, round(HEIGHT - SPLIT, 2)], fuzzy_reservoir=[0.0, round(SPLIT, 2)], fuzzy_dochtkorb=None,
+        # Joe 16.11. (später): "das fuzzy skin kann weg" -> Standard aus (FUZZY=True schreibt die Bereiche wieder)
+        fuzzy_topf=[0.0, round(HEIGHT - SPLIT, 2)] if FUZZY else None, fuzzy_reservoir=[0.0, round(SPLIT, 2)] if FUZZY else None, fuzzy_dochtkorb=None,
         hinweis="Innenboden-Oberkante: darunter Lightning, darüber Grid (Joe, 15.11.); Naht back"),
         open(out + "/slicer_%s.json" % NAME, "w"), indent=1, ensure_ascii=False)
     print("STL: %s/{pot,reservoir%s}_%s.stl" % (out, ",testring_*" if TEST else "", NAME))
