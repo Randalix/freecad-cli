@@ -42,12 +42,12 @@ CORD_R     = P("CORD_R", 4.0)     # Ringradius
 CORD_SX    = P("CORD_SX", 1.3)    # Streckung in x
 CORD_TUBE  = P("CORD_TUBE", 1.6)  # Rohrradius
 CORD_DZ    = P("CORD_DZ", 10.0)   # Kanal so weit unter der Fuge
-CORD_BOSS  = P("CORD_BOSS", 2.6)  # Wand um den Kanal (wasserdicht: >= 2,4 zum Wasser), Verdickung nur innen in der Reservoir-Ecke, unten 45°
+CORD_BOSS  = P("CORD_BOSS", 2.1)  # Rand der Boss-Ellipse um den Kanal; ergibt >= 1,6 Wand zum Wasser (Joe 16.11.: nur wasserdicht, kaum Druck), Verdickung nur innen in der Reservoir-Ecke, unten 45°
 CORD_ROOF  = P("CORD_ROOF", 60.0)  # Joe 16.11. (Gießwasser spritzt von der flachen Oberseite zurück): Verdickung oben als Dach, so steil (Grad, 0 = flach)
 POUR_FUNNEL = P("POUR_FUNNEL", True)  # Joe 16.11. (Gießöffnung maximal): innere Oberkante des Reservoirs in den Ecken 45° abgeschrägt,
                                       # in Flucht mit der Innenflanke der Lippe -> alles innerhalb des Lippenkamms läuft ins Wasser
 POUR_FLAT_MAX = P("POUR_FLAT_MAX", 45.0)  # Regel: unter der Gießöffnung keine Fläche flacher als das (Grad) über der Füllmarke
-MIN_WATER_WALL = P("MIN_WATER_WALL", 2.4)  # Mindestwand zwischen Wasserraum und Außenluft (Kanal, Ecken)
+MIN_WATER_WALL = P("MIN_WATER_WALL", 1.6)  # Mindestwand zwischen Wasserraum und Außenluft (Kanal, Ecken)
 # Hub-Bajonett (Joe 14.11.): Topf gerade aus der Nut heben, 45° drehen -> Rampen heben ihn weiter, rastet stabil ein
 LIFT       = P("LIFT", True)
 # Joe 15.11.: "erst heben, dann drehen" ist nicht intuitiv -> Lippe als flaches Trapez (45° beidseitig) und V-Kerben:
@@ -231,13 +231,16 @@ else:
 res_cav = inner.common(slab(WALL, SPLIT + LIP_H + 1))
 # Schnurkanal: Torus; Verdickung (Boss) nur dort, wo er in den Wasserraum ragen würde, Unterseite 45° (druckbar)
 m = Matrix(); m.scale(CORD_SX, 1, 1)
-rb = CORD_R + CORD_TUBE + CORD_BOSS                 # Boss-Radius um die Kanalmitte (in x gestreckt)
+# Boss = enge Ellipse um den gestreckten Kanal: Halbachsen = Kanal-Außenmaß + CORD_BOSS (Streckung nur auf den Ring, nicht auf die Wand)
+rb = CORD_R + CORD_TUBE + CORD_BOSS                 # Halbachse y
+bsx = (CORD_R * CORD_SX + CORD_TUBE + CORD_BOSS) / rb   # Streckung des Boss in x
 hb = CORD_TUBE + CORD_BOSS                          # halbe Boss-Höhe
 tor = Part.makeTorus(CORD_R, CORD_TUBE).transformGeometry(m)
+mb = Matrix(); mb.scale(bsx, 1, 1)
 boss0 = Part.makeCylinder(rb, 2 * hb, V(0, 0, -hb)).fuse(
-    Part.makeCone(0, rb, rb * CORD_SX, V(0, 0, -hb - rb * CORD_SX))).transformGeometry(m)  # Kegelhöhe x Streckung -> nach Streckung >= 45°
+    Part.makeCone(0, rb, rb * bsx, V(0, 0, -hb - rb * bsx))).transformGeometry(mb)  # Kegelhöhe x Streckung -> nach Streckung >= 45°
 if CORD_ROOF:   # Dach: Kegel, nach der Streckung in x mindestens CORD_ROOF steil (in y steiler)
-    boss0 = boss0.fuse(Part.makeCone(rb, 0, rb * CORD_SX * math.tan(math.radians(CORD_ROOF)), V(0, 0, hb)).transformGeometry(m))
+    boss0 = boss0.fuse(Part.makeCone(rb, 0, rb * bsx * math.tan(math.radians(CORD_ROOF)), V(0, 0, hb)).transformGeometry(mb))
 cords, bosses = [], []
 for sx in (-1, 1):
     for sy in (-1, 1):
