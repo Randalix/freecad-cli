@@ -48,6 +48,12 @@ POUR_FUNNEL = P("POUR_FUNNEL", True)  # Joe 16.11. (Gießöffnung maximal): inne
                                       # in Flucht mit der Innenflanke der Lippe -> alles innerhalb des Lippenkamms läuft ins Wasser
 POUR_FLAT_MAX = P("POUR_FLAT_MAX", 45.0)  # Regel: unter der Gießöffnung keine Fläche flacher als das (Grad) über der Füllmarke
 MIN_WATER_WALL = P("MIN_WATER_WALL", 1.6)  # Mindestwand zwischen Wasserraum und Außenluft (Kanal, Ecken)
+# Joe 16.11. (Etsy: geriffelte Töpfe beliebt, "der Pot bleibt flach, es geht nur um die Riffel"): senkrechte Riffel außen,
+# auf die glatte Hülle aufgesetzt (Wand 5,3 bleibt überall, Innenleben unverändert), laufen über die Fuge durch
+RIFFEL       = P("RIFFEL", True)
+RIFFEL_PITCH = P("RIFFEL_PITCH", 3.2)   # Abstand der Riffel (mm, entlang des Umfangs; Anzahl auf Vielfaches von 4 gerundet)
+RIFFEL_DEPTH = P("RIFFEL_DEPTH", 1.0)   # Höhe Kamm über Tal (mm); Kosinusprofil, Außenmaß wächst um 2x DEPTH
+RIFFEL_RAMP  = P("RIFFEL_RAMP", 8.0)    # unten in der Bodenrundung so lang einblenden (mm Höhe) -> Überhang bleibt < 45°
 # Hub-Bajonett (Joe 14.11.): Topf gerade aus der Nut heben, 45° drehen -> Rampen heben ihn weiter, rastet stabil ein
 LIFT       = P("LIFT", True)
 # Joe 15.11.: "erst heben, dann drehen" ist nicht intuitiv -> Lippe als flaches Trapez (45° beidseitig) und V-Kerben:
@@ -215,6 +221,58 @@ pot_body = pot.cut(cav).cut(Part.makeCompound(holes))    # ohne Nut (für Testri
 groove, groove_top = make_groove(FLANK_CLEAR)
 pot = pot_body.cut(groove).removeSplitter()
 
+# --- Riffel außen (senkrecht, folgen unten der Bodenrundung) -------------------
+RIFFEL_N = 0
+def riffel_wire(inset, z, amp):
+    """Kontur rr(inset) mit Riffeln nach außen: je Riffel ein Kreisbogen (Tal -> Kamm -> Tal, Täler 0,05 in der Wand),
+    analytische Flächen statt BSpline (BSpline-Variante: fuse 860 s, ungültig). Parametrisierung nach Umfangsanteil,
+    damit jede Riffel in allen Höhen dieselbe Nummer behält (senkrecht; in der Bodenrundung laufen sie leicht zusammen)."""
+    r = BEVEL - inset
+    cx, cy = HX - BEVEL, HY - BEVEL
+    segs = [("l", (cx + r, 0), (0, 1), cy), ("a", (cx, cy), 0.0, r * math.pi / 2), ("l", (cx, cy + r), (-1, 0), 2 * cx),
+            ("a", (-cx, cy), 90.0, r * math.pi / 2), ("l", (-cx - r, cy), (0, -1), 2 * cy), ("a", (-cx, -cy), 180.0, r * math.pi / 2),
+            ("l", (-cx, -cy - r), (1, 0), 2 * cx), ("a", (cx, -cy), 270.0, r * math.pi / 2), ("l", (cx + r, -cy), (0, 1), cy)]
+    L = sum(sg[3] for sg in segs)
+    def pt(t, f):
+        s = L * (t % 1.0)
+        for kind, p0, d, ln in segs:
+            if s <= ln + 1e-9:
+                break
+            s -= ln
+        if kind == "l":
+            x, y = p0[0] + d[0] * s, p0[1] + d[1] * s; nx_, ny_ = d[1], -d[0]
+        else:
+            a = math.radians(d) + s / r; nx_, ny_ = math.cos(a), math.sin(a); x, y = p0[0] + r * nx_, p0[1] + r * ny_
+        return V(x + nx_ * f, y + ny_ * f, z)
+    N = RIFFEL_N
+    vs = [pt(i / N, -0.05) for i in range(N)]
+    edges = [Part.Arc(vs[i], pt((i + 0.5) / N, max(amp, 0.02)), vs[(i + 1) % N]).toShape() for i in range(N)]
+    return Part.Wire(edges)
+
+ribs = None
+if RIFFEL:
+    _L0 = 4 * (HX - BEVEL) + 4 * (HY - BEVEL) + 2 * math.pi * BEVEL
+    RIFFEL_N = max(4, int(round(_L0 / RIFFEL_PITCH / 4)) * 4)
+    _zt = core_z0 - BEVEL * math.cos(math.radians(45))      # Ende der 45°-Fase unten
+    _z0 = max(_zt, 0.0) + 2.0                                # Start: Bodenrundung hier < 45° (Rippenanstieg kommt dazu)
+    def _ins(z):   # Einzug der Kugel-Bodenrundung in Höhe z
+        u = core_z0 - z
+        return BEVEL - math.sqrt(max(BEVEL ** 2 - u * u, 0.0)) if u > 0 else 0.0
+    _zs = [_z0 + k * (core_z0 - _z0) / max(1, int(math.ceil(core_z0 - _z0))) for k in range(int(math.ceil(core_z0 - _z0)) + 1)]
+    _secs = [riffel_wire(_ins(z), z, RIFFEL_DEPTH * min(1.0, (z - _z0) / RIFFEL_RAMP)) for z in _zs]
+    _top = riffel_wire(0.0, HEIGHT, RIFFEL_DEPTH)
+    # Rampe bis core_z0 nicht ganz eingeblendet? dann im geraden Teil fertig einblenden
+    if core_z0 - _z0 < RIFFEL_RAMP:
+        _zr = _z0 + RIFFEL_RAMP
+        ribs = Part.makeLoft(_secs + [riffel_wire(0.0, _zr, RIFFEL_DEPTH)], True, False).fuse(prism(_top, _zr, HEIGHT))
+    else:
+        ribs = Part.makeLoft(_secs, True, False).fuse(prism(_top, core_z0, HEIGHT))
+    # nur als Haut: innen 1 mm unter der glatten Außenfläche abschneiden (innerhalb POT_SKIN, Nut/Löcher/Kanäle bleiben frei)
+    ribs = ribs.cut(core.makeOffsetShape(BEVEL - 1.0, 1e-3, join=0)).removeSplitter()
+    pot = pot.fuse(ribs.common(slab(SPLIT, HEIGHT))).removeSplitter()
+    print("Riffel: %d Stück, Abstand %.2f mm, Tiefe %.1f mm, ab z %.1f, Außenmaß %.1f x %.1f" % (
+        RIFFEL_N, _L0 / RIFFEL_N, RIFFEL_DEPTH, _z0, SIZE_X + 2 * RIFFEL_DEPTH, SIZE_Y + 2 * RIFFEL_DEPTH))
+
 # --- Reservoir (z 0..SPLIT, Lippe bis SPLIT+LIP_H) ----------------------------
 res = base.common(slab(0, SPLIT))
 if BOTTOM_45:
@@ -252,7 +310,10 @@ for sx in (-1, 1):
         b = boss0.copy(); b.translate(d); bosses.append(b)
 cords = Part.makeCompound(cords)
 bosses = Part.makeCompound(bosses).common(res).common(slab(WALL, SPLIT))
-reservoir = res.fuse(lip).removeSplitter().cut(res_cav).fuse(bosses).removeSplitter().cut(cords).removeSplitter()
+reservoir = res.fuse(lip).removeSplitter().cut(res_cav).fuse(bosses).removeSplitter()
+if ribs is not None:   # vor dem Schnurkanal, damit die Kanalöffnungen in den Ecken frei durch die Riffel gehen
+    reservoir = reservoir.fuse(ribs.common(slab(-1, SPLIT))).removeSplitter()
+reservoir = reservoir.cut(cords).removeSplitter()
 pour_open = None
 if POUR_FUNNEL or POUR_FLAT_MAX:   # Gießöffnung = innerhalb des Lippenkamms, außerhalb des um CAM_TURN gedrehten Topfs
     _ol = Part.Face(rr(0, 0)); _ol.rotate(V(0, 0, 0), V(0, 0, 1), CAM_TURN if LIFT else 45.0)
