@@ -43,6 +43,10 @@ CORD_SX    = P("CORD_SX", 1.3)    # Streckung in x
 CORD_TUBE  = P("CORD_TUBE", 1.6)  # Rohrradius
 CORD_DZ    = P("CORD_DZ", 10.0)   # Kanal so weit unter der Fuge
 CORD_BOSS  = P("CORD_BOSS", 2.6)  # Wand um den Kanal (wasserdicht: >= 2,4 zum Wasser), Verdickung nur innen in der Reservoir-Ecke, unten 45°
+CORD_ROOF  = P("CORD_ROOF", 60.0)  # Joe 16.11. (Gießwasser spritzt von der flachen Oberseite zurück): Verdickung oben als Dach, so steil (Grad, 0 = flach)
+POUR_FUNNEL = P("POUR_FUNNEL", True)  # Joe 16.11. (Gießöffnung maximal): innere Oberkante des Reservoirs in den Ecken 45° abgeschrägt,
+                                      # in Flucht mit der Innenflanke der Lippe -> alles innerhalb des Lippenkamms läuft ins Wasser
+POUR_FLAT_MAX = P("POUR_FLAT_MAX", 45.0)  # Regel: unter der Gießöffnung keine Fläche flacher als das (Grad) über der Füllmarke
 MIN_WATER_WALL = P("MIN_WATER_WALL", 2.4)  # Mindestwand zwischen Wasserraum und Außenluft (Kanal, Ecken)
 # Hub-Bajonett (Joe 14.11.): Topf gerade aus der Nut heben, 45° drehen -> Rampen heben ihn weiter, rastet stabil ein
 LIFT       = P("LIFT", True)
@@ -232,6 +236,8 @@ hb = CORD_TUBE + CORD_BOSS                          # halbe Boss-Höhe
 tor = Part.makeTorus(CORD_R, CORD_TUBE).transformGeometry(m)
 boss0 = Part.makeCylinder(rb, 2 * hb, V(0, 0, -hb)).fuse(
     Part.makeCone(0, rb, rb * CORD_SX, V(0, 0, -hb - rb * CORD_SX))).transformGeometry(m)  # Kegelhöhe x Streckung -> nach Streckung >= 45°
+if CORD_ROOF:   # Dach: Kegel, nach der Streckung in x mindestens CORD_ROOF steil (in y steiler)
+    boss0 = boss0.fuse(Part.makeCone(rb, 0, rb * CORD_SX * math.tan(math.radians(CORD_ROOF)), V(0, 0, hb)).transformGeometry(m))
 cords, bosses = [], []
 for sx in (-1, 1):
     for sy in (-1, 1):
@@ -241,6 +247,17 @@ for sx in (-1, 1):
 cords = Part.makeCompound(cords)
 bosses = Part.makeCompound(bosses).common(res).common(slab(WALL, SPLIT))
 reservoir = res.fuse(lip).removeSplitter().cut(res_cav).fuse(bosses).removeSplitter().cut(cords).removeSplitter()
+pour_open = None
+if POUR_FUNNEL or POUR_FLAT_MAX:   # Gießöffnung = innerhalb des Lippenkamms, außerhalb des um CAM_TURN gedrehten Topfs
+    _ol = Part.Face(rr(0, 0)); _ol.rotate(V(0, 0, 0), V(0, 0, 1), CAM_TURN if LIFT else 45.0)
+    pour_open = Part.Face(rr(LIP_IN + LIP_H + LIP_TOP if LIP_V else LIP_OUT, 0)).cut(_ol)
+if POUR_FUNNEL:
+    assert LIP_V, "POUR_FUNNEL setzt die V-Lippe voraus (Trichter in Flucht mit der Innenflanke)"
+    d_f = WALL - LIP_OUT + 6.0   # tief genug: der flache Boden des Schneidkörpers darf die Verdickung nicht treffen
+    funnel = loft(rr(LIP_OUT + d_f, SPLIT - d_f), rr(LIP_OUT, SPLIT))     # 45°, Verlängerung der Lippen-Innenflanke
+    _ol3 = prism(_ol.OuterWire, SPLIT - d_f - 1, SPLIT + 1)
+    funnel = funnel.cut(_ol3)
+    reservoir = reservoir.cut(funnel).removeSplitter()
 cav_real = res_cav.cut(bosses)
 cord_wall = min(t.distToShape(cav_real)[0] for t in cords.Solids)
 assert cord_wall >= MIN_WATER_WALL - 0.05, "Schnurkanal zu nah am Wasserraum (%.2f mm, CORD_BOSS erhöhen)" % cord_wall
@@ -485,6 +502,30 @@ if WICK:
     cord_wall = min(t_.distToShape(cav_real.fuse(Part.makeCompound(marks)))[0] for t_ in cords.Solids)
     assert cord_wall >= MIN_WATER_WALL - 0.05, "Füllmarke schwächt den Schnurkanal (%.2f mm)" % cord_wall
 pot_collide = Part.makeCompound([pot, basket_seated]) if basket_seated is not None else pot
+
+
+def regel_giessen():
+    """REGEL Gießöffnung (Joe 16.11.): unter der Öffnung in Gießstellung keine Fläche flacher als POUR_FLAT_MAX
+    zwischen Füllmarke und Fuge (flache Flächen dort lassen Gießwasser zurückspritzen)."""
+    import MeshPart
+    msh = MeshPart.meshFromShape(Shape=reservoir.common(slab(SPLIT - FILL_DZ + 0.05, SPLIT + LIP_H + 1)),
+                                 LinearDeflection=0.1, AngularDeflection=0.1)
+    cz, bad, flat = math.cos(math.radians(POUR_FLAT_MAX - 2.0)), 0.0, []   # 2° Toleranz: Netzfacetten auf 45°-Kegeln (Lippe, Trichter) liegen bei 44,4°
+    for f in msh.Facets:
+        n = f.Normal
+        if n.z <= cz: continue
+        c = [sum(p[i] for p in f.Points) / 3 for i in range(3)]
+        if c[2] < SPLIT - FILL_DZ + 0.1: continue   # Schnittfläche des Prüfbereichs
+        if pour_open.isInside(V(c[0], c[1], 0), 0.01, True):
+            bad += f.Area; flat.append(c)
+    print("Regel Gießöffnung: %.0f mm² Öffnung je Ecke, %.1f mm² Fläche flacher als %g° darunter (Füllmarke bis Fuge)" % (
+        pour_open.Area / max(len(pour_open.Faces), 1), bad, POUR_FLAT_MAX))
+    if flat:
+        c = max(flat, key=lambda q: q[2])
+        print("  höchste flache Stelle bei (%.1f, %.1f, %.2f)" % tuple(c))
+    assert bad < 1.0, "REGEL Gießöffnung: %.1f mm² flache Fläche unter der Gießöffnung (Wasser spritzt zurück)" % bad
+if POUR_FLAT_MAX:
+    regel_giessen()
 
 # --- Fugen-Testringe: volle Kontur, flach (Zentrierung lässt sich nur am ganzen Umfang prüfen) -------
 if TEST:
