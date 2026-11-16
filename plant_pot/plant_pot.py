@@ -51,8 +51,10 @@ MIN_WATER_WALL = P("MIN_WATER_WALL", 1.6)  # Mindestwand zwischen Wasserraum und
 # Joe 16.11. (Etsy: geriffelte Töpfe beliebt, "der Pot bleibt flach, es geht nur um die Riffel"): senkrechte Riffel außen,
 # auf die glatte Hülle aufgesetzt (Wand 5,3 bleibt überall, Innenleben unverändert), laufen über die Fuge durch
 RIFFEL       = P("RIFFEL", True)
-RIFFEL_PITCH = P("RIFFEL_PITCH", 3.2)   # Abstand der Riffel (mm, entlang des Umfangs; Anzahl auf Vielfaches von 4 gerundet)
-RIFFEL_DEPTH = P("RIFFEL_DEPTH", 1.0)   # Höhe Kamm über Tal (mm); Kosinusprofil, Außenmaß wächst um 2x DEPTH
+RIFFEL_PITCH = P("RIFFEL_PITCH", 2.0)   # Abstand der Riffel (mm, entlang des Umfangs; Anzahl auf Vielfaches von 4 gerundet)
+RIFFEL_DEPTH = P("RIFFEL_DEPTH", 0.8)   # Höhe Kamm über Tal (mm); Kreisbogen-Kamm, spitzes Tal, Außenmaß wächst um 2x DEPTH
+RIFFEL_LIN   = P("RIFFEL_LIN", 0.01)    # STL der Riffel-Haut: Sehnenfehler mm
+RIFFEL_ANG   = P("RIFFEL_ANG", 0.15)    # STL der Riffel-Haut: Winkel rad
 RIFFEL_RAMP  = P("RIFFEL_RAMP", 8.0)    # unten in der Bodenrundung so lang einblenden (mm Höhe) -> Überhang bleibt < 45°
 # Hub-Bajonett (Joe 14.11.): Topf gerade aus der Nut heben, 45° drehen -> Rampen heben ihn weiter, rastet stabil ein
 LIFT       = P("LIFT", True)
@@ -260,16 +262,25 @@ if RIFFEL:
         return BEVEL - math.sqrt(max(BEVEL ** 2 - u * u, 0.0)) if u > 0 else 0.0
     _zs = [_z0 + k * (core_z0 - _z0) / max(1, int(math.ceil(core_z0 - _z0))) for k in range(int(math.ceil(core_z0 - _z0)) + 1)]
     _secs = [riffel_wire(_ins(z), z, RIFFEL_DEPTH * min(1.0, (z - _z0) / RIFFEL_RAMP)) for z in _zs]
-    _top = riffel_wire(0.0, HEIGHT, RIFFEL_DEPTH)
-    # Rampe bis core_z0 nicht ganz eingeblendet? dann im geraden Teil fertig einblenden
-    if core_z0 - _z0 < RIFFEL_RAMP:
-        _zr = _z0 + RIFFEL_RAMP
-        ribs = Part.makeLoft(_secs + [riffel_wire(0.0, _zr, RIFFEL_DEPTH)], True, False).fuse(prism(_top, _zr, HEIGHT))
-    else:
-        ribs = Part.makeLoft(_secs, True, False).fuse(prism(_top, core_z0, HEIGHT))
-    # nur als Haut: innen 1 mm unter der glatten Außenfläche abschneiden (innerhalb POT_SKIN, Nut/Löcher/Kanäle bleiben frei)
-    ribs = ribs.cut(core.makeOffsetShape(BEVEL - 1.0, 1e-3, join=0)).removeSplitter()
-    pot = pot.fuse(ribs.common(slab(SPLIT, HEIGHT))).removeSplitter()
+    # Riffel als eigene Hautkörper (Joe 16.11.: "müssen nicht verbunden sein, können ineinander gesteckt sein"):
+    # ohne Boolean mit Topf/Reservoir, innen 1 mm unter der glatten Außenfläche (in POT_SKIN), im STL als zweiter Körper
+    def _ring_prism(z0, z1):
+        f = Part.makeFace([riffel_wire(0.0, z0, RIFFEL_DEPTH), rr(1.0, z0)], "Part::FaceMakerBullseye")
+        return f.extrude(V(0, 0, z1 - z0))
+    if core_z0 - _z0 < RIFFEL_RAMP:   # Rampe reicht in den geraden Teil: dort mit konstantem Einzug weiter
+        _zs = _zs + [_z0 + RIFFEL_RAMP]
+        _secs = _secs + [riffel_wire(0.0, _zs[-1], RIFFEL_DEPTH)]
+    _zs = _zs + [SPLIT]; _secs = _secs + [riffel_wire(0.0, SPLIT, RIFFEL_DEPTH)]   # bis zur Fuge ein Körper (kein Stoß in einer Ebene)
+    _inn = [rr(_ins(z) + 1.0, z) for z in _zs]
+    _sh_o = Part.makeLoft(_secs, False, True); _sh_i = Part.makeLoft(_inn, False, True)   # ruled: Abschnitte ~1 mm, Knick < 3°
+    _f0 = Part.makeFace([_secs[0], _inn[0]], "Part::FaceMakerBullseye"); _f1 = Part.makeFace([_secs[-1], _inn[-1]], "Part::FaceMakerBullseye")
+    _shell = Part.Shell(_sh_o.Faces + _sh_i.Faces + [_f0, _f1]); _shell.sewShape()   # gemeinsame Kanten -> geschlossenes STL
+    rib_bot = Part.Solid(_shell)
+    if rib_bot.Volume < 0:
+        rib_bot.reverse()
+    rib_pot = _ring_prism(SPLIT, HEIGHT)
+    rib_res = [rib_bot]
+    ribs = True
     print("Riffel: %d Stück, Abstand %.2f mm, Tiefe %.1f mm, ab z %.1f, Außenmaß %.1f x %.1f" % (
         RIFFEL_N, _L0 / RIFFEL_N, RIFFEL_DEPTH, _z0, SIZE_X + 2 * RIFFEL_DEPTH, SIZE_Y + 2 * RIFFEL_DEPTH))
 
@@ -311,9 +322,9 @@ for sx in (-1, 1):
 cords = Part.makeCompound(cords)
 bosses = Part.makeCompound(bosses).common(res).common(slab(WALL, SPLIT))
 reservoir = res.fuse(lip).removeSplitter().cut(res_cav).fuse(bosses).removeSplitter()
-if ribs is not None:   # vor dem Schnurkanal, damit die Kanalöffnungen in den Ecken frei durch die Riffel gehen
-    reservoir = reservoir.fuse(ribs.common(slab(-1, SPLIT))).removeSplitter()
 reservoir = reservoir.cut(cords).removeSplitter()
+if ribs is not None:   # Kanalöffnungen in den Ecken frei durch die Riffel-Haut
+    rib_res = [r_.cut(cords) if r_.BoundBox.ZMin < CORD_Z + CORD_TUBE + 0.5 and r_.BoundBox.ZMax > CORD_Z - CORD_TUBE - 0.5 else r_ for r_ in rib_res]
 pour_open = None
 if POUR_FUNNEL or POUR_FLAT_MAX:   # Gießöffnung = innerhalb des Lippenkamms, außerhalb des um CAM_TURN gedrehten Topfs
     _ol = Part.Face(rr(0, 0)); _ol.rotate(V(0, 0, 0), V(0, 0, 1), CAM_TURN if LIFT else 45.0)
@@ -624,13 +635,15 @@ if TEST:
         t_bj_pot = t_bj_pot_asm.copy(); t_bj_pot.translate(V(0, 0, -SPLIT))
 
 # --- Ausgabe ----------------------------------------------------------------
-pot_print = pot.copy(); pot_print.translate(V(0, 0, -SPLIT))
-res_side = reservoir.copy(); res_side.translate(V(SIZE_X + 20, 0, 0))
+pot_out = Part.makeCompound([pot, rib_pot]) if ribs is not None else pot              # Ausgabe: Körper + Riffel-Haut (ineinander gesteckt)
+res_out = Part.makeCompound([reservoir] + rib_res) if ribs is not None else reservoir
+pot_print = pot_out.copy(); pot_print.translate(V(0, 0, -SPLIT))
+res_side = res_out.copy(); res_side.translate(V(SIZE_X + 20, 0, 0))
 cad.material("Topf", "pla_schwarz"); cad.material("Reservoir", "pla_schwarz")
 if globals().get("NO_REPORT"):   # aufrufendes Skript meldet selbst (z. B. plant_pot_giessen.py)
     pass
 elif globals().get("BAUGRUPPE"):   # Einbaulage (plant_pot_baugruppe.py): Fuge/Schnurkanal prüfen
-    named = dict(Topf=pot, Reservoir=reservoir)
+    named = dict(Topf=pot_out, Reservoir=res_out)
     if basket_seated is not None:
         named["Dochtkorb"] = basket_seated; cad.material("Dochtkorb", "pla_schwarz")
     cad.report(**named)
@@ -672,15 +685,23 @@ if out:
         mm, n_, amax = knickkanten([(q.x, q.y, q.z) for q in pts], tris)
         print("Regel Facetten %s: %.0f mm sichtbare Knickkanten (Grenze %g)" % (fn, mm, STL_FACET_MAX))
         assert mm <= STL_FACET_MAX, "REGEL Facetten: %s hat %.0f mm Knickkanten 2,5-15° (max %.1f°) -> STL_LIN/STL_ANG feiner" % (fn, mm, amax)
-    def stl(shape, fn):
+    def stl(shape, fn, extra=()):
         # fein (Joe 15.11.: Facetten an den Rundungen sichtbar bei 0,05/0,2 = 8° pro Facette an R20)
         msh = MeshPart.meshFromShape(Shape=shape, LinearDeflection=STL_LIN, AngularDeflection=STL_ANG)
         regel_facetten(msh, fn)
+        for e_ in extra:   # Riffel-Haut: eigener Körper im selben STL, gröber vernetzt (R ~0,8: 0,15 rad = Sehnenfehler < 0,003 mm,
+            # Facette 0,12 mm, unter Düsenauflösung) und ohne Facettenregel (die gilt den großen Rundungen); fein: 113 MB Reservoir
+            msh.addMesh(MeshPart.meshFromShape(Shape=e_, LinearDeflection=RIFFEL_LIN, AngularDeflection=RIFFEL_ANG))
         msh.write(out + "/" + fn)
-    stl(pot_print, "pot_%s.stl" % NAME)
+    _pb = pot.copy(); _pb.translate(V(0, 0, -SPLIT))
+    _pr = []
+    if ribs is not None:
+        _pr = [rib_pot.copy()]; _pr[0].translate(V(0, 0, -SPLIT))
+    stl(_pb, "pot_%s.stl" % NAME, _pr)
     if BODEN_PROBE:
-        stl(pot_print.common(slab(-1, POT_FLOOR + BODEN_PROBE)).removeSplitter(), "probe_boden_%s.stl" % NAME)
-    stl(reservoir, "reservoir_%s.stl" % NAME)
+        _sl = slab(-1, POT_FLOOR + BODEN_PROBE)
+        stl(_pb.common(_sl).removeSplitter(), "probe_boden_%s.stl" % NAME, [r_.common(_sl) for r_ in _pr])
+    stl(reservoir, "reservoir_%s.stl" % NAME, rib_res if ribs is not None else ())
     if basket is not None:
         stl(basket, "dochtkorb_%s.stl" % NAME)
     if TEST:
