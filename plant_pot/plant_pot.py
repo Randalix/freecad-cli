@@ -64,6 +64,8 @@ CAM_CL     = P("CAM_CL", 0.4)     # radiale Luft Ring <-> Kanal im Topf
 CAM_TEETH  = P("CAM_TEETH", 4)    # Zähne im Topf (bei 0/90/180/270°, mittig über den Seiten)
 TOOTH_R    = P("TOOTH_R", 3.0)    # Joe 15.11. (Drehen ruckelt über die Layerstufen der Rampe): Zahnspitze rund, gleitet über die
                                   # Stufenkanten statt hineinzufallen (Rest-Holpern ~ Stufenlänge² / 8R). 0 = spitzes 45°-V
+FEIN_TOPF  = P("FEIN_TOPF", False)  # Joe 16.11.: 0,1-mm-Schichten unten am Topf sieht man an der Außenwand (Schichthöhe gilt je Schicht fürs ganze Teil).
+                                    # Aus: am Topf gleitet auf der Rampe immer dieselbe Stelle der runden Zahnspitze, die Stufen der Rampe (Reservoir, fein) zählen
 TOOTH_W    = P("TOOTH_W", None)   # Zahnbreite (tangential), Unterseite 45°-V mit runder Spitze (None = 6 bei rundem Zahn, sonst 4)
 CAM_ZT     = P("CAM_ZT", 0.5)     # Zahnspitze über der Fuge (Topf aufgesetzt)
 CAM_C      = P("CAM_C", 0.3)      # Luft Zahn <-> Kerbengrund im aufgesetzten Zustand (Topf liegt auf Fuge, nicht auf Zähnen)
@@ -633,7 +635,7 @@ if out:
         kurvenring_r=round(CAM_R, 2) if LIFT else None,
         # Joe 15.11.: feine Schichten nur dort, wo beim Drehen etwas gleitet (Lippe/Nut, Zähne, Kurvenring) -> kleinere Layerstufen
         fein_schichthoehe=0.1 if LIFT else None,
-        fein_topf=[0.0, round(_fein_topf, 2)] if LIFT else None,           # Druckhöhe Topf: V-Nut + Zahnspitzen
+        fein_topf=[0.0, round(_fein_topf, 2)] if LIFT and FEIN_TOPF else None,           # Druckhöhe Topf: V-Nut + Zahnspitzen
         fein_reservoir=[round(SPLIT, 2), round(_fein_res, 2)] if LIFT else None,   # Druckhöhe Reservoir: Lippe + Kurvenbahn
         hinweis="Innenboden-Oberkante: darunter Lightning, darüber Grid (Joe, 15.11.); Naht back"),
         open(out + "/slicer_%s.json" % NAME, "w"), indent=1, ensure_ascii=False)
