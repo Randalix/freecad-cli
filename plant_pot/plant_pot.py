@@ -40,6 +40,7 @@ FLANK_CLEAR = P("FLANK_CLEAR", 0.0)  # Spiel an der 45°-Schräge (waagerecht); 
 GROOVE_TOP = P("GROOVE_TOP", 0.4) # Luft über der Lippe in der Nut
 SEAM_CH    = P("SEAM_CH", 0.0)    # Fase an beiden Fugenkanten außen (Joe 14.11.: keine Fase, Kante scharf -> Elefantenfuß im Slicer kompensieren)
 # Schnurkanal (Aufhängung) je Ecke: Torus, senkrechte Achse, in x gestreckt
+OESEN      = P("OESEN", True)     # Joe 17.11.: zwei Modelle im Shop, mit Ösen (Aufhängung) und ohne; False = Reservoir ohne Schnurkanäle
 CORD_INSET = P("CORD_INSET", 5.05)  # Mitte so weit innerhalb der Außenkante (x und y)
 CORD_R     = P("CORD_R", 4.0)     # Ringradius
 CORD_SX    = P("CORD_SX", 1.3)    # Streckung in x
@@ -330,16 +331,20 @@ boss0 = Part.makeCylinder(rb, 2 * hb, V(0, 0, -hb)).fuse(
 if CORD_ROOF:   # Dach: Kegel, nach der Streckung in x mindestens CORD_ROOF steil (in y steiler)
     boss0 = boss0.fuse(Part.makeCone(rb, 0, rb * bsx * math.tan(math.radians(CORD_ROOF)), V(0, 0, hb)).transformGeometry(mb))
 cords, bosses = [], []
-for sx in (-1, 1):
+for sx in ((-1, 1) if OESEN else ()):
     for sy in (-1, 1):
         d = V(sx * (HX - CORD_INSET), sy * (HY - CORD_INSET), CORD_Z)
         t = tor.copy(); t.translate(d); cords.append(t)
         b = boss0.copy(); b.translate(d); bosses.append(b)
 cords = Part.makeCompound(cords)
-bosses = Part.makeCompound(bosses).common(res).common(slab(RES_FLOOR, SPLIT))
-reservoir = res.fuse(lip).removeSplitter().cut(res_cav).fuse(bosses).removeSplitter()
-reservoir = reservoir.cut(cords).removeSplitter()
-if ribs is not None:   # Kanalöffnungen in den Ecken frei durch die Riffel-Haut
+if OESEN:
+    bosses = Part.makeCompound(bosses).common(res).common(slab(RES_FLOOR, SPLIT))
+    reservoir = res.fuse(lip).removeSplitter().cut(res_cav).fuse(bosses).removeSplitter()
+    reservoir = reservoir.cut(cords).removeSplitter()
+else:
+    bosses = Part.makeCompound([])
+    reservoir = res.fuse(lip).removeSplitter().cut(res_cav).removeSplitter()
+if ribs is not None and OESEN:   # Kanalöffnungen in den Ecken frei durch die Riffel-Haut
     rib_res = [r_.cut(cords) if r_.BoundBox.ZMin < CORD_Z + CORD_TUBE + 0.5 and r_.BoundBox.ZMax > CORD_Z - CORD_TUBE - 0.5 else r_ for r_ in rib_res]
 pour_open = None
 if POUR_FUNNEL or POUR_FLAT_MAX:   # Gießöffnung = innerhalb des Lippenkamms, außerhalb des um CAM_TURN gedrehten Topfs
@@ -352,9 +357,9 @@ if POUR_FUNNEL:
     _ol3 = prism(_ol.OuterWire, SPLIT - d_f - 1, SPLIT + 1)
     funnel = funnel.cut(_ol3)
     reservoir = reservoir.cut(funnel).removeSplitter()
-cav_real = res_cav.cut(bosses)
-cord_wall = min(t.distToShape(cav_real)[0] for t in cords.Solids)
-assert cord_wall >= MIN_WATER_WALL - 0.05, "Schnurkanal zu nah am Wasserraum (%.2f mm, CORD_BOSS erhöhen)" % cord_wall
+cav_real = res_cav.cut(bosses) if OESEN else res_cav
+cord_wall = min(t.distToShape(cav_real)[0] for t in cords.Solids) if OESEN else float("nan")
+assert not OESEN or cord_wall >= MIN_WATER_WALL - 0.05, "Schnurkanal zu nah am Wasserraum (%.2f mm, CORD_BOSS erhöhen)" % cord_wall
 
 # --- Hub-Bajonett ---------------------------------------------------------------
 def revolve_profile(pts):
@@ -593,8 +598,9 @@ if WICK:
             x0 = (HX - WALL - 1) if sx > 0 else (-HX + WALL - mD)
             marks.append(Part.makeBox(mD + 1, mL, mH, V(x0, cym - mL / 2, zf)))
     reservoir = reservoir.cut(Part.makeCompound(marks)).removeSplitter()
-    cord_wall = min(t_.distToShape(cav_real.fuse(Part.makeCompound(marks)))[0] for t_ in cords.Solids)
-    assert cord_wall >= MIN_WATER_WALL - 0.05, "Füllmarke schwächt den Schnurkanal (%.2f mm)" % cord_wall
+    if OESEN:
+        cord_wall = min(t_.distToShape(cav_real.fuse(Part.makeCompound(marks)))[0] for t_ in cords.Solids)
+    assert not OESEN or cord_wall >= MIN_WATER_WALL - 0.05, "Füllmarke schwächt den Schnurkanal (%.2f mm)" % cord_wall
 pot_collide = Part.makeCompound([pot, basket_seated]) if basket_seated is not None else pot
 
 
@@ -664,7 +670,7 @@ elif globals().get("BAUGRUPPE"):   # Einbaulage (plant_pot_baugruppe.py): Fuge/S
         named["Dochtkorb"] = basket_seated; cad.material("Dochtkorb", "pla_schwarz")
     cad.report(**named)
     cad.focus("Fuge", (HX - 5, 0, SPLIT + 3), 14, view="front")
-    cad.focus("Schnurkanal", (HX - CORD_INSET, HY - CORD_INSET, CORD_Z), 24, view="iso")
+    if OESEN: cad.focus("Schnurkanal", (HX - CORD_INSET, HY - CORD_INSET, CORD_Z), 24, view="iso")
 elif globals().get("NUR_TEST"):
     named = {"TestReservoir": t_res}
     if t_bj_res is not None:
@@ -717,7 +723,7 @@ if out:
     if BODEN_PROBE:
         _sl = slab(-1, POT_FLOOR + BODEN_PROBE)
         stl(_pb.common(_sl).removeSplitter(), "probe_boden_%s.stl" % NAME, [r_.common(_sl) for r_ in _pr])
-    stl(reservoir, "reservoir_%s.stl" % NAME, rib_res if ribs is not None else ())
+    stl(reservoir, ("reservoir_%s.stl" if OESEN else "reservoir_ohne_oesen_%s.stl") % NAME, rib_res if ribs is not None else ())
     if basket is not None:
         stl(basket, "dochtkorb_%s.stl" % NAME, lin=min(STL_LIN, 0.003))   # langer Konus (180er, WICK_GAP 0,5): bei 0,005 Knickkanten 3,3°
     if TEST:
