@@ -92,12 +92,15 @@ POT_FLOOR  = P("POT_FLOOR", None)  # Topfboden (None = WALL, oder dicker, wenn d
 CAM_WIN    = P("CAM_WIN", (8.0, 5.0))  # Wasserfenster unten im Ring (Breite, Höhe bis Dachansatz)
 # Dochtkorb (Joe 14.11.: Selbstbewässerung über Erdsäule in der Mitte statt Fäden)
 WICK       = P("WICK", True)
-WICK_R     = P("WICK_R", None)    # Korb außen oben (None = 30, bei kleinen Töpfen kleiner) (Öffnung im Topfboden = WICK_R + WICK_FIT)
+WICK_R     = P("WICK_R", None)    # Korb außen oben (None = aus WICK_SHARE, max 30, innerhalb des Ringkanals) (Öffnung im Topfboden = WICK_R + WICK_FIT)
+# Joe 17.11.2026 (Korb beim 100er zu groß: Öffnung 41 % des Topfbodens, 180er 12 %): Korb skaliert mit der Bodenfläche.
+# Überschlag: Nachschub durch die Erdsäule auch bei Ø 38 ein Vielfaches des Verbrauchs; die Nässe der Erde hängt an der Höhe über dem Wasser.
+WICK_SHARE = P("WICK_SHARE", 0.20)  # Öffnung im Topfboden (mit Kragen) als Anteil der Innenbodenfläche (None = so groß wie möglich)
 WICK_RB    = P("WICK_RB", None)   # Korb außen unten (None = WICK_R - 4)
 WICK_T     = P("WICK_T", 1.6)     # Korbwand / -boden (gap-frei)
 WICK_FIT   = P("WICK_FIT", 0.3)   # radiale Luft Korb <-> Öffnung
 WICK_COLLAR = P("WICK_COLLAR", 3.0)  # 45°-Kegelkragen oben (Senkung im Topfboden), bündig mit der Bodenfläche
-WICK_GAP   = P("WICK_GAP", 3.0)   # Korbboden über Reservoirboden (aufgesetzt)
+WICK_GAP   = P("WICK_GAP", 0.5)   # Korbboden über Reservoirboden (aufgesetzt); Joe 17.11.: bis auf den Boden, damit alles Wasser genutzt wird (0,5 = Höhentoleranz, Korb hängt im Topf)
 WICK_SLOTS = P("WICK_SLOTS", 24)  # senkrechte Schlitze im Korbteil unter dem Topfboden
 WICK_SLOT_W = P("WICK_SLOT_W", 2.0)
 FILL_DZ    = P("FILL_DZ", 10.0)   # Füllmarke so weit unter der Fuge (Luftspalt unter dem Topfboden)
@@ -126,8 +129,12 @@ CAM_R = min(60.0, min(HX, HY) - 2 * WALL - 2.5 - CAM_CL) if CAM_R is None else C
 CAM_RI = CAM_R - CAM_T                   # Innenradius Kurvenring
 CH_RI, CH_RO = CAM_RI - CAM_CL, CAM_R + CAM_CL   # Ringkanal im Topf
 NAME = NAME or "%gx%gx%g" % (SIZE_X, SIZE_Y, HEIGHT)
-if WICK_R is None:   # Dochtkorb so groß wie möglich, max 30, innerhalb des Ringkanals
+if WICK_R is None:   # Dochtkorb nach WICK_SHARE, max 30, innerhalb des Ringkanals
     WICK_R = min(30.0, (CH_RI - 1.6 - WICK_FIT - WICK_COLLAR - 1.0) if LIFT else 30.0)
+    if WICK_SHARE:
+        _ri = BEVEL - WALL   # Innenboden Topf: gerundetes Rechteck mit Eckradius BEVEL-WALL
+        _a_floor = (SIZE_X - 2 * WALL) * (SIZE_Y - 2 * WALL) - (4 - math.pi) * _ri ** 2
+        WICK_R = min(WICK_R, math.sqrt(WICK_SHARE * _a_floor / math.pi) - WICK_FIT - WICK_COLLAR)
 WICK_RB = WICK_R - 4.0 if WICK_RB is None else WICK_RB
 assert SPLIT >= BEVEL - BOTTOM_DROP, "Fuge liegt in der Bodenrundung (Reservoir höher machen)"
 assert SPLIT - WALL > 5, "Reservoir zu flach"
@@ -694,9 +701,9 @@ if out:
         mm, n_, amax = knickkanten([(q.x, q.y, q.z) for q in pts], tris)
         print("Regel Facetten %s: %.0f mm sichtbare Knickkanten (Grenze %g)" % (fn, mm, STL_FACET_MAX))
         assert mm <= STL_FACET_MAX, "REGEL Facetten: %s hat %.0f mm Knickkanten 2,5-15° (max %.1f°) -> STL_LIN/STL_ANG feiner" % (fn, mm, amax)
-    def stl(shape, fn, extra=()):
+    def stl(shape, fn, extra=(), lin=None):
         # fein (Joe 15.11.: Facetten an den Rundungen sichtbar bei 0,05/0,2 = 8° pro Facette an R20)
-        msh = MeshPart.meshFromShape(Shape=shape, LinearDeflection=STL_LIN, AngularDeflection=STL_ANG)
+        msh = MeshPart.meshFromShape(Shape=shape, LinearDeflection=STL_LIN if lin is None else lin, AngularDeflection=STL_ANG)
         regel_facetten(msh, fn)
         for e_ in extra:   # Riffel-Haut: eigener Körper im selben STL, gröber vernetzt (R ~0,8: 0,15 rad = Sehnenfehler < 0,003 mm,
             # Facette 0,12 mm, unter Düsenauflösung) und ohne Facettenregel (die gilt den großen Rundungen); fein: 113 MB Reservoir
@@ -712,7 +719,7 @@ if out:
         stl(_pb.common(_sl).removeSplitter(), "probe_boden_%s.stl" % NAME, [r_.common(_sl) for r_ in _pr])
     stl(reservoir, "reservoir_%s.stl" % NAME, rib_res if ribs is not None else ())
     if basket is not None:
-        stl(basket, "dochtkorb_%s.stl" % NAME)
+        stl(basket, "dochtkorb_%s.stl" % NAME, lin=min(STL_LIN, 0.003))   # langer Konus (180er, WICK_GAP 0,5): bei 0,005 Knickkanten 3,3°
     if TEST:
         stl(t_res, "testring_reservoir_%s.stl" % NAME)
         if t_bj_res is not None:
