@@ -732,6 +732,9 @@ if out:
         # Joe 16.11.: leichtes Fuzzy Skin auf der Außenwand. Nur die sichtbare Außenhaut (Druckhöhe): Topf ganz, Reservoir bis zur Fuge;
         # darüber am Reservoir nur Lippe (Zentrierflanke) und Kurvenring (Spiel 0,4) -> glatt. Dochtkorb glatt (Spiel 0,3 in der Öffnung).
         fuge_reservoir=round(SPLIT, 2),
+        # Joe 17.11.: Wasserboden ohne Brücke/Infill. Bottom+Top füllen nur die Bodenfläche; der Ring unter der 5,3er Wand bekäme sonst
+        # Sparse + Brücke darüber (Druck-Agent, v027-Slice) -> 100 % Füllung bis knapp über RES_FLOOR (+1,5 g / 0 min beim 100er)
+        massiv_reservoir=[0.0, round(RES_FLOOR + 0.2, 2)],
         # Joe 16.11. (später): "das fuzzy skin kann weg" -> Standard aus (FUZZY=True schreibt die Bereiche wieder)
         fuzzy_topf=[0.0, round(HEIGHT - SPLIT, 2)] if FUZZY else None, fuzzy_reservoir=[0.0, round(SPLIT, 2)] if FUZZY else None, fuzzy_dochtkorb=None,
         hinweis="Reservoirboden RES_FLOOR durchgehend massiv (Boden+Decke); Topf: Innenboden-Oberkante darunter Lightning, darüber Grid (Joe, 15.11.); Naht back"),
