@@ -37,7 +37,7 @@ LIP_H      = P("LIP_H", 3.0)      # Lippenhöhe über der Fuge: 0,8 Fase + 2,2 F
 LIP_CH     = P("LIP_CH", 1.0)     # 45°-Zentrierschräge außen an der Lippe (einzige Kontaktfläche der Nut)
 FLANK_CLEAR = P("FLANK_CLEAR", 0.0)  # Spiel an der 45°-Schräge (waagerecht); 0 = setzt zugleich mit den Flachseiten auf (wie Gridfinity-Fuß FOOT_PLAY 0,00).
                                      # Bestimmung per Ring-Serie (TEST_FLANKS), Druck macht Nuten enger und Lippen breiter
-GROOVE_FC  = P("GROOVE_FC", 0.2)   # Joe 17.11. (Spalt an der Fuge sichtbar, Topf sitzt nicht auf): V-Nut im Topf an der Außenflanke so viel weiter
+GROOVE_FC  = P("GROOVE_FC", 0.1)   # Joe 17.11.: Testringe 0/0,1 ohne Unterschied, Spalt kam vom Verzug (kippelt); 0,1 statt 0,2 (weniger seitliche Luft). Ursprung: Spalt an der Fuge sichtbar -> V-Nut im Topf an der Außenflanke so viel weiter
                                      # (waagerecht), Lippe am Reservoir unverändert -> passt zum gedruckten v027-Reservoir; Topf trägt auf der Fläche, nicht auf der Lippe
 TOPF_RING_W = P("TOPF_RING_W", 8.0)  # Joe 17.11. (Linie außen auf Höhe Topfboden): Slicer-Modifier-Ring ab Außenkante so breit, z 0..POT_FLOOR, 100 % Füllung
 GROOVE_TOP = P("GROOVE_TOP", 0.4) # Luft über der Lippe in der Nut
@@ -87,7 +87,7 @@ CAM_ZT     = P("CAM_ZT", 0.5)     # Zahnspitze über der Fuge (Topf aufgesetzt)
 CAM_C      = P("CAM_C", 0.3)      # Luft Zahn <-> Kerbengrund im aufgesetzten Zustand (Topf liegt auf Fuge, nicht auf Zähnen)
 CAM_L1     = P("CAM_L1", None)    # gerader Hub bis die Lippe frei ist (None = LIP_H + 0,3)
 CAM_H2     = P("CAM_H2", 4.0)     # zusätzlicher Hub durch die 45°-Drehung
-CAM_DET    = P("CAM_DET", 0.5)    # Tiefe der Rastmulde (45°-V) am Rampenende
+CAM_DET    = P("CAM_DET", 1.0)    # Tiefe der Rastmulde (45°-V) am Rampenende; Joe 17.11.: mit 0,5 dreht man über die Gießstellung hinaus zurück in die geschlossene -> 1,0
 CAM_TURN   = P("CAM_TURN", 45.0)  # Drehwinkel bis zur Rast
 CAM_NOTCH_CL = P("CAM_NOTCH_CL", 0.15)  # tangentiale Luft Zahn <-> Kerbe je Seite (eng: richtet die Drehung vor dem Einfädeln der Lippe aus)
 CAM_FUNNEL = P("CAM_FUNNEL", 1.0)  # 45°-Trichter oben an der Kerbe
