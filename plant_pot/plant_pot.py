@@ -110,10 +110,10 @@ WICK_SLOT_W = P("WICK_SLOT_W", 2.0)
 FILL_DZ    = P("FILL_DZ", 10.0)   # Füllmarke so weit unter der Fuge (Luftspalt unter dem Topfboden)
 FILL_MARK  = P("FILL_MARK", (10.0, 1.0, 0.6, 30.0))  # Kerbe: Länge, Höhe, Tiefe, Abstand Mitte von der Außenecke (entlang der Seite)
 TEST       = P("TEST", True)      # Fugen-Testringe (volle Kontur, flach) mit ausgeben
-TEST_FLANKS = P("TEST_FLANKS", (0.0, 0.1, 0.2, 0.3))  # FLANK_CLEAR-Serie für die Topf-Testringe
-TEST_POT_H = P("TEST_POT_H", 6.0)  # Höhe Topf-Testring (Nut + Dach + Rest)
+TEST_FLANKS = P("TEST_FLANKS", (0.0, 0.1))  # Joe 17.11.: 0,2 steckt in der Bodenprobe/im Topf (GROOVE_FC), Ringe nur 0 und 0,1  # FLANK_CLEAR-Serie für die Topf-Testringe
+TEST_POT_H = P("TEST_POT_H", 3.5)  # Höhe Topf-Testring (Nut + Dach + Rest); Joe 17.11.: Tests kürzer (6 -> 3,5, Nutscheitel bei ~1,1)
 TEST_RES_H = P("TEST_RES_H", 4.0)  # Reservoir-Testring: so viel Wand unter der Fuge (+ Lippe)
-BODEN_PROBE = P("BODEN_PROBE", 12.0)  # Joe 15.11. (Linie außen auf Bodenhöhe): Topf-Unterteil bis Bodenoberkante + so viel Wand als Probe-STL (0 = aus)
+BODEN_PROBE = P("BODEN_PROBE", 3.0)  # Joe 15.11. (Linie außen auf Bodenhöhe): Topf-Unterteil bis Bodenoberkante + so viel Wand als Probe-STL (0 = aus)
 NAME       = P("NAME", None)      # Dateiname-Zusatz; None = <Breite>x<Tiefe>x<Höhe>
 
 HX, HY = SIZE_X / 2, SIZE_Y / 2
