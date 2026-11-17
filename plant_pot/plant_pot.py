@@ -24,6 +24,9 @@ BOTTOM_DROP = P("BOTTOM_DROP", BEVEL / 6)  # Bodenrundung wird so weit unter z=0
 BOTTOM_45  = P("BOTTOM_45", True) # Bodenrundung unten bis zur 45°-Tangente als Fase auffüllen (kein flacher Überhang)
 # Schale (Joe 14.11.: Wandstärke überall gleich, Radien innen/außen konzentrisch)
 WALL       = P("WALL", 5.3)       # Wand und Böden von Topf und Reservoir; min = POT_SKIN + Nut + 1,6 (= 5,3)
+# Joe 17.11.2026 (einziger undichter Houdini-Topf: Wasserboden = 1 Brücke über Infill): Reservoirboden so dünn, dass Boden- und
+# Deckschichten direkt ineinander übergehen (3 + 5 Schichten à 0,2 = 1,6) -> durchgehend massiv, keine Brücke, mehr Wasser.
+RES_FLOOR  = P("RES_FLOOR", 1.6)  # Reservoirboden (None = WALL wie bis v026)
 HOLE_SP    = P("HOLE_SP", 30.0)   # Raster Drainagelöcher
 HOLE_R     = P("HOLE_R", 2.5)     # Radius Drainageloch
 # Fuge
@@ -171,6 +174,12 @@ cx, cy = HX - BEVEL, HY - BEVEL
 core = Part.makeBox(2 * cx, 2 * cy, HEIGHT + BEVEL - core_z0, V(-cx, -cy, core_z0))
 base = core.makeOffsetShape(BEVEL, 1e-3, join=0)
 inner = core.makeOffsetShape(BEVEL - WALL, 1e-3, join=0)   # Innenfläche: gleiche Kernform, Radien = Außen - WALL
+RES_FLOOR = WALL if RES_FLOOR is None else RES_FLOOR
+_zi0 = WALL - BOTTOM_DROP                                    # Unterkante der Innenform (flacher Innenboden)
+res_inner = inner.copy()
+if RES_FLOOR < _zi0:   # Innenform absenken (Seitenwände senkrecht -> unverändert, Bodenrundung wird höchstens so viel dünner)
+    res_inner.translate(V(0, 0, RES_FLOOR - _zi0))
+assert RES_FLOOR >= MIN_WATER_WALL - 1e-6, "RES_FLOOR dünner als MIN_WATER_WALL"
 
 # --- Topf (Einbaulage z SPLIT..HEIGHT) -----------------------------------------
 pot = base.common(slab(SPLIT, HEIGHT))
@@ -300,7 +309,7 @@ else:
     lip = band(LIP_IN, LIP_OUT, SPLIT - 0.5, SPLIT + LIP_H - LIP_CH).fuse(
         loft(rr(LIP_IN, SPLIT + LIP_H - LIP_CH), rr(LIP_IN + LIP_CH, SPLIT + LIP_H)).cut(
             prism(rr(LIP_OUT, 0), SPLIT + LIP_H - LIP_CH - 1, SPLIT + LIP_H + 1)))
-res_cav = inner.common(slab(WALL, SPLIT + LIP_H + 1))
+res_cav = res_inner.common(slab(RES_FLOOR, SPLIT + LIP_H + 1))
 # Schnurkanal: Torus; Verdickung (Boss) nur dort, wo er in den Wasserraum ragen würde, Unterseite 45° (druckbar)
 m = Matrix(); m.scale(CORD_SX, 1, 1)
 # Boss = enge Ellipse um den gestreckten Kanal: Halbachsen = Kanal-Außenmaß + CORD_BOSS (Streckung nur auf den Ring, nicht auf die Wand)
@@ -320,7 +329,7 @@ for sx in (-1, 1):
         t = tor.copy(); t.translate(d); cords.append(t)
         b = boss0.copy(); b.translate(d); bosses.append(b)
 cords = Part.makeCompound(cords)
-bosses = Part.makeCompound(bosses).common(res).common(slab(WALL, SPLIT))
+bosses = Part.makeCompound(bosses).common(res).common(slab(RES_FLOOR, SPLIT))
 reservoir = res.fuse(lip).removeSplitter().cut(res_cav).fuse(bosses).removeSplitter()
 reservoir = reservoir.cut(cords).removeSplitter()
 if ribs is not None:   # Kanalöffnungen in den Ecken frei durch die Riffel-Haut
@@ -492,12 +501,12 @@ if LIFT:
     _, (h_n, h_s, h_t) = cam_profile()
     assert CH_RO + WALL < min(HX, HY) - WALL - 2, "Kurvenring zu groß für den Topf"
     # Reservoir: Kurvenring auf dem Boden, unten Wasserfenster (Dach 45°)
-    ring = cam_ring(WALL - 0.5)
+    ring = cam_ring(RES_FLOOR - 0.5)
     ww, wh = CAM_WIN
     wins = []
     for k in range(CAM_TEETH):
         a = (k + 0.5) * 360.0 / CAM_TEETH
-        prof = [(-ww / 2, WALL - 1), (ww / 2, WALL - 1), (ww / 2, WALL + wh), (0, WALL + wh + ww / 2), (-ww / 2, WALL + wh)]
+        prof = [(-ww / 2, RES_FLOOR - 1), (ww / 2, RES_FLOOR - 1), (ww / 2, RES_FLOOR + wh), (0, RES_FLOOR + wh + ww / 2), (-ww / 2, RES_FLOOR + wh)]
         f = Part.Face(Part.makePolygon([V(CAM_RI - 1, t, z) for t, z in prof] + [V(CAM_RI - 1, prof[0][0], prof[0][1])]))
         w_ = f.extrude(V(CAM_T + 2, 0, 0)); w_.rotate(V(0, 0, 0), V(0, 0, 1), a); wins.append(w_)
     ring = ring.cut(Part.makeCompound(wins))
@@ -533,7 +542,7 @@ if LIFT:
 # --- Dochtkorb (separates Teil, hängt im Topfboden) --------------------------
 basket = basket_seated = None
 if WICK:
-    zb0 = WALL + WICK_GAP                       # Korbboden (aufgesetzt)
+    zb0 = RES_FLOOR + WICK_GAP                  # Korbboden (aufgesetzt)
     ztop = SPLIT + POT_FLOOR                    # Bodenfläche Topf innen = Oberkante Korb
     zc0 = ztop - WICK_COLLAR                    # Kragenbeginn
     assert WICK_R + WICK_COLLAR + 2 < (CH_RI if LIFT else HX - WALL), "Dochtkorb zu groß (trifft Bajonett-Kanal)"
@@ -664,9 +673,9 @@ else:
         bk = basket.copy(); bk.translate(V(0, -(SIZE_Y / 2 + 50), 0)); named["Dochtkorb"] = bk; cad.material("Dochtkorb", "pla_schwarz")
     cad.report(**named)
 
-water = cav_real.common(slab(WALL, SPLIT)).Volume / 1000
+water = cav_real.common(slab(RES_FLOOR, SPLIT)).Volume / 1000
 if WICK:
-    water_fill = cav_real.common(slab(WALL, SPLIT - FILL_DZ)).cut(revolve_profile(outer_prof)).Volume / 1000
+    water_fill = cav_real.common(slab(RES_FLOOR, SPLIT - FILL_DZ)).cut(revolve_profile(outer_prof)).Volume / 1000
     print("Dochtkorb: Ø %.0f/%.0f, Länge %.1f, taucht aufgesetzt %.1f mm ein (bis Füllmarke); Wasser bis Füllmarke %.0f ml, Luftspalt %.0f mm" % (
         2 * WICK_R, 2 * WICK_RB, ztop - zb0, (SPLIT - FILL_DZ) - zb0, water_fill, FILL_DZ))
 print("Größe %s: Topf %g x %g x %g, Reservoir %g x %g x %g (+ Lippe %g) mm" % (
@@ -714,7 +723,7 @@ if out:
     import json
     json.dump(dict(  # Höhen in Druckkoordinaten (Teil liegt auf z=0) für die Slicer-Modifier
         name=NAME, topf_hoehe=round(HEIGHT - SPLIT, 2), reservoir_hoehe=round(SPLIT + LIP_H, 2),
-        topf_boden_oben=round(POT_FLOOR, 2), reservoir_boden_oben=round(WALL, 2), wand=WALL,
+        topf_boden_oben=round(POT_FLOOR, 2), reservoir_boden_oben=round(RES_FLOOR, 2), wand=WALL,
         kurvenring_r=round(CAM_R, 2) if LIFT else None,
         # Joe 15.11.: feine Schichten nur dort, wo beim Drehen etwas gleitet (Lippe/Nut, Zähne, Kurvenring) -> kleinere Layerstufen
         fein_schichthoehe=0.1 if LIFT else None,
@@ -725,6 +734,6 @@ if out:
         fuge_reservoir=round(SPLIT, 2),
         # Joe 16.11. (später): "das fuzzy skin kann weg" -> Standard aus (FUZZY=True schreibt die Bereiche wieder)
         fuzzy_topf=[0.0, round(HEIGHT - SPLIT, 2)] if FUZZY else None, fuzzy_reservoir=[0.0, round(SPLIT, 2)] if FUZZY else None, fuzzy_dochtkorb=None,
-        hinweis="Innenboden-Oberkante: darunter Lightning, darüber Grid (Joe, 15.11.); Naht back"),
+        hinweis="Reservoirboden RES_FLOOR durchgehend massiv (Boden+Decke); Topf: Innenboden-Oberkante darunter Lightning, darüber Grid (Joe, 15.11.); Naht back"),
         open(out + "/slicer_%s.json" % NAME, "w"), indent=1, ensure_ascii=False)
     print("STL: %s/{pot,reservoir%s}_%s.stl" % (out, ",testring_*" if TEST else "", NAME))
