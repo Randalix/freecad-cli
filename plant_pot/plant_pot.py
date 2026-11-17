@@ -37,6 +37,9 @@ LIP_H      = P("LIP_H", 3.0)      # Lippenhöhe über der Fuge: 0,8 Fase + 2,2 F
 LIP_CH     = P("LIP_CH", 1.0)     # 45°-Zentrierschräge außen an der Lippe (einzige Kontaktfläche der Nut)
 FLANK_CLEAR = P("FLANK_CLEAR", 0.0)  # Spiel an der 45°-Schräge (waagerecht); 0 = setzt zugleich mit den Flachseiten auf (wie Gridfinity-Fuß FOOT_PLAY 0,00).
                                      # Bestimmung per Ring-Serie (TEST_FLANKS), Druck macht Nuten enger und Lippen breiter
+GROOVE_FC  = P("GROOVE_FC", 0.2)   # Joe 17.11. (Spalt an der Fuge sichtbar, Topf sitzt nicht auf): V-Nut im Topf an der Außenflanke so viel weiter
+                                     # (waagerecht), Lippe am Reservoir unverändert -> passt zum gedruckten v027-Reservoir; Topf trägt auf der Fläche, nicht auf der Lippe
+TOPF_RING_W = P("TOPF_RING_W", 8.0)  # Joe 17.11. (Linie außen auf Höhe Topfboden): Slicer-Modifier-Ring ab Außenkante so breit, z 0..POT_FLOOR, 100 % Füllung
 GROOVE_TOP = P("GROOVE_TOP", 0.4) # Luft über der Lippe in der Nut
 SEAM_CH    = P("SEAM_CH", 0.0)    # Fase an beiden Fugenkanten außen (Joe 14.11.: keine Fase, Kante scharf -> Elefantenfuß im Slicer kompensieren)
 # Schnurkanal (Aufhängung) je Ecke: Torus, senkrechte Achse, in x gestreckt
@@ -107,7 +110,7 @@ WICK_SLOT_W = P("WICK_SLOT_W", 2.0)
 FILL_DZ    = P("FILL_DZ", 10.0)   # Füllmarke so weit unter der Fuge (Luftspalt unter dem Topfboden)
 FILL_MARK  = P("FILL_MARK", (10.0, 1.0, 0.6, 30.0))  # Kerbe: Länge, Höhe, Tiefe, Abstand Mitte von der Außenecke (entlang der Seite)
 TEST       = P("TEST", True)      # Fugen-Testringe (volle Kontur, flach) mit ausgeben
-TEST_FLANKS = P("TEST_FLANKS", (0.0, 0.05, 0.1))  # FLANK_CLEAR-Serie für die Topf-Testringe
+TEST_FLANKS = P("TEST_FLANKS", (0.0, 0.1, 0.2, 0.3))  # FLANK_CLEAR-Serie für die Topf-Testringe
 TEST_POT_H = P("TEST_POT_H", 6.0)  # Höhe Topf-Testring (Nut + Dach + Rest)
 TEST_RES_H = P("TEST_RES_H", 4.0)  # Reservoir-Testring: so viel Wand unter der Fuge (+ Lippe)
 BODEN_PROBE = P("BODEN_PROBE", 12.0)  # Joe 15.11. (Linie außen auf Bodenhöhe): Topf-Unterteil bis Bodenoberkante + so viel Wand als Probe-STL (0 = aus)
@@ -237,7 +240,7 @@ if LIFT:   # Löcher, die den Ringkanal treffen würden, weglassen
 if WICK:   # Löcher in der Korböffnung samt Senkung weglassen (die Öffnung ersetzt sie)
     holes = [h for h in holes if math.hypot(h.BoundBox.Center.x, h.BoundBox.Center.y) - HOLE_R > WICK_R + WICK_COLLAR + 1]
 pot_body = pot.cut(cav).cut(Part.makeCompound(holes))    # ohne Nut (für Testringe)
-groove, groove_top = make_groove(FLANK_CLEAR)
+groove, groove_top = make_groove(FLANK_CLEAR + GROOVE_FC)
 pot = pot_body.cut(groove).removeSplitter()
 
 # --- Riffel außen (senkrecht, folgen unten der Bodenrundung) -------------------
@@ -720,6 +723,8 @@ if out:
     if ribs is not None:
         _pr = [rib_pot.copy()]; _pr[0].translate(V(0, 0, -SPLIT))
     stl(_pb, "pot_%s.stl" % NAME, _pr)
+    if TOPF_RING_W:   # Modifier (kein Druckteil): Ring an der Außenwand über die Bodenhöhe -> keine Lightning-Füllung/Brücke an der Wand
+        stl(band(-1.0, TOPF_RING_W, 0.0, POT_FLOOR), "modifier_topfboden_ring_%s.stl" % NAME)
     if BODEN_PROBE:
         _sl = slab(-1, POT_FLOOR + BODEN_PROBE)
         stl(_pb.common(_sl).removeSplitter(), "probe_boden_%s.stl" % NAME, [r_.common(_sl) for r_ in _pr])
@@ -748,6 +753,11 @@ if out:
         # Joe 17.11.: Wasserboden ohne Brücke/Infill. Bottom+Top füllen nur die Bodenfläche; der Ring unter der 5,3er Wand bekäme sonst
         # Sparse + Brücke darüber (Druck-Agent, v027-Slice) -> 100 % Füllung bis knapp über RES_FLOOR (+1,5 g / 0 min beim 100er)
         massiv_reservoir=[0.0, round(RES_FLOOR + 0.2, 2)],
+        # Joe 17.11.: Linie außen am Topf auf Höhe der Bodenoberkante (Brücke über Lightning zieht die Wand). Modifier-STL liegt in
+        # Topf-Druckkoordinaten (gleicher Ursprung wie pot_*.stl): dort 100 % Füllung; Rest des Bodens wie gehabt
+        modifier_topfboden_ring=dict(stl="modifier_topfboden_ring_%s.stl" % NAME, z=[0.0, round(POT_FLOOR, 2)], breite=TOPF_RING_W,
+                                     sparse_infill_density="100%") if TOPF_RING_W else None,
+        nut_spiel_aussenflanke=GROOVE_FC,
         # Joe 16.11. (später): "das fuzzy skin kann weg" -> Standard aus (FUZZY=True schreibt die Bereiche wieder)
         fuzzy_topf=[0.0, round(HEIGHT - SPLIT, 2)] if FUZZY else None, fuzzy_reservoir=[0.0, round(SPLIT, 2)] if FUZZY else None, fuzzy_dochtkorb=None,
         hinweis="Reservoirboden RES_FLOOR durchgehend massiv (Boden+Decke); Topf: Innenboden-Oberkante darunter Lightning, darüber Grid (Joe, 15.11.); Naht back"),
