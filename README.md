@@ -1,104 +1,112 @@
-# freecad-cli — `cad`: FreeCAD per Skript, ohne GUI
+# freecad-cli — `cad`: scripted FreeCAD, no GUI
 
-`cad` lässt Agenten (und Menschen) FreeCAD-Modelle per Python-Skript bauen, messen, ansehen und prüfen, ohne GUI und ohne MCP-Server. Ein persistenter headless FreeCAD-Worker hält das Dokument im Speicher, ein dünner Client (`cad`) spricht über einen Unix-Socket mit ihm. Bilder rendert Blender headless: technische Ansicht mit Lineal oder ein „schöner" Stil mit Materialien, Bemaßung, Schnitt, Explosion und GLB-Export. Ein Skill ([`skill/SKILL.md`](skill/SKILL.md)) bringt Claude Code die Arbeitsweise bei.
+`cad` lets agents (and humans) build, measure, view and check FreeCAD models from Python scripts, with no GUI and no MCP server. A persistent headless FreeCAD worker keeps the document in memory; a thin client (`cad`) talks to it over a Unix socket. Images are rendered headless in Blender: a technical view with a millimetre ruler, or a "pretty" style (`schoen`) with materials, dimensions, sections, exploded views and GLB export. A skill ([`skill/SKILL.md`](skill/SKILL.md)) teaches Claude Code the workflow.
 
 ```
-cad run model.py --report              # Skript ausführen, Messwerte der Objekte
-cad look                               # Sheet iso/front/right/top mit mm-Lineal
-cad look --style schoen --dims         # Bild für Menschen: Material, Perspektive, Bemaßung
-cad look --section x=40 --focus all    # Schnitt, kritische Stellen heranzoomen
-cad hotspots / cad check --line-w std  # kritische Stellen, Druckbarkeit, Gap-Fill
-cad projekt demo && cad version "v1"   # Projekt mit versionierten Ordnern
+cad run model.py --report              # run a script, print measurements of the objects
+cad look                               # sheet iso/front/right/top with mm ruler
+cad look --style schoen --dims         # image for humans: materials, perspective, dimensions
+cad look --section x=40 --focus all    # section view, zoom in on critical spots
+cad hotspots / cad check --line-w std  # critical spots, printability, gap fill
+cad projekt demo && cad version "v1"   # project with versioned folders
 ```
-Alle Befehle: `cad --help`, `cad look -h`.
+All commands: `cad --help`, `cad look -h`.
 
-## Voraussetzungen
-| | getestet mit | wofür |
+> Note: the code, comments, commit messages and some command names (`projekt`, `freigabe`, `schoen`, `aktuell`, …) are in German. The commands are listed here as they are typed.
+
+## Requirements
+| | tested with | used for |
 |---|---|---|
-| Linux mit systemd (User-Instanz) | | Worker-Dienst; ohne systemd Worker von Hand starten |
-| Python 3 | 3.9+ (nur Standardbibliothek) | Client `cad`, `cadrun`, `cadprojekt.py` |
-| FreeCAD | 1.1.4 (AppImage genügt) | Worker: `freecad -c cad_worker.py` (headless) |
-| Blender | 5.1.1 | Render, Schnitte, Explosion, GLB; das Python von Blender braucht `numpy` und `Pillow` |
+| Linux with systemd (user instance) | | worker service; without systemd, start the worker by hand |
+| Python 3 | 3.9+ (standard library only) | client `cad`, `cadrun`, `cadprojekt.py` |
+| FreeCAD | 1.1.4 (AppImage is fine) | worker: `freecad -c cad_worker.py` (headless) |
+| Blender | 5.1.1 | rendering, sections, exploded views, GLB; Blender's Python needs `numpy` and `Pillow` |
 
-Optional: `ssh` (nur wenn Projektordner auf einer Netzfreigabe liegen, auf der Symlinks nicht möglich sind).
+Optional: `ssh` (only needed when project folders live on a network share that does not support symlinks).
 
 ## Installation
-1. **Klonen** an einen beliebigen Ort:
+1. **Clone** anywhere:
    ```
-   git clone <repo-url> ~/tools/freecad-cli
+   git clone https://github.com/Randalix/freecad-cli ~/tools/freecad-cli
    cd ~/tools/freecad-cli
    ```
-2. **FreeCAD und Blender** bereitstellen (siehe Voraussetzungen). FreeCAD muss headless laufen: `freecad -c </dev/null` darf nicht auf ein Display warten; im Skript nie `PySide`/`pivy` importieren. Blender wird mit `env -u LD_LIBRARY_PATH -u DISPLAY` gestartet (macht `cad` selbst); liegt es nicht im `PATH`, `CAD_BLENDER=/pfad/zu/blender` setzen.
-3. **Konfigurieren:** `cad.env.example` nach `~/.config/cad/env` kopieren und anpassen (Zeilen `KEY=VALUE`; Umgebungsvariablen haben Vorrang, Pfad der Datei über `CAD_CONFIG`). Mindestens:
+2. **Provide FreeCAD and Blender** (see requirements). FreeCAD must run headless: `freecad -c </dev/null` must not wait for a display; never import `PySide`/`pivy` in model scripts. Blender is started with `env -u LD_LIBRARY_PATH -u DISPLAY` (`cad` does this itself); if it is not on `PATH`, set `CAD_BLENDER=/path/to/blender`.
+3. **Configure:** copy `cad.env.example` to `~/.config/cad/env` and adjust it (`KEY=VALUE` lines; environment variables take precedence, the file location can be changed with `CAD_CONFIG`). At minimum:
    ```
-   CAD_DIR=~/tools/freecad-cli            # Ort dieses Repos (Worker findet seine Module)
-   CAD_PROJEKT_ROOT=~/cad-projekte        # Wurzel der Projekte  <root>/<projekt>/vNNN_…/
-   CAD_OUT=~/cad-projekte/cad_out         # Ausgaben ohne aktives Projekt
-   CAD_BLENDER=/opt/blender/blender       # nur falls nicht im PATH
+   CAD_DIR=~/tools/freecad-cli            # location of this repo (the worker loads its modules from here)
+   CAD_PROJEKT_ROOT=~/cad-projects        # project root  <root>/<project>/vNNN_…/
+   CAD_OUT=~/cad-projects/cad_out         # output when no project is active
+   CAD_BLENDER=/opt/blender/blender       # only if not on PATH
    ```
-   (`~` am Wertanfang wird expandiert.)
-4. **`cad` in den PATH:**
+   (A leading `~` in a value is expanded.)
+4. **Put `cad` on your PATH:**
    ```
    ln -s "$CAD_DIR/cad" ~/bin/cad && ln -s "$CAD_DIR/cadrun" ~/bin/cadrun
    ```
-5. **Worker-Dienst** installieren: `systemd/cadworker.service` nach `~/.config/systemd/user/` kopieren, `ExecStart` (Pfad zu FreeCAD und zu `cad_worker.py`) und `Environment=` (die `CAD_*`-Variablen) anpassen, dann `systemctl --user daemon-reload`. `cad run …` startet den Dienst bei Bedarf; er beendet sich nach 15 Minuten ohne Anfrage (`CAD_IDLE_S`).
-6. **Skill für Claude Code** (optional): `skill/SKILL.md` nach `<projekt>/.claude/skills/cad/SKILL.md` oder `~/.claude/skills/cad/SKILL.md` kopieren. Der Skill beschreibt die Schleife bauen → messen → ansehen → prüfen und die Regel, dass zur Abnahme immer das gerenderte Bild vorgelegt wird.
-7. **Prüfen:**
+5. **Install the worker service:** copy `systemd/cadworker.service` to `~/.config/systemd/user/`, adjust `ExecStart` (paths to FreeCAD and `cad_worker.py`) and `Environment=` (the `CAD_*` variables), then run `systemctl --user daemon-reload`. `cad run …` starts the service on demand; it exits after 15 minutes without requests (`CAD_IDLE_S`).
+6. **Claude Code skill** (optional): copy `skill/SKILL.md` to `<project>/.claude/skills/cad/SKILL.md` or `~/.claude/skills/cad/SKILL.md`. The skill describes the loop build → measure → look → check, and the rule that a rendered image is always presented for sign-off.
+7. **Verify:**
    ```
    cad worker status
-   python3 bench/run_bench.py --quick     # Regression/Zeit, erwartet: alle PASS
-   cad look pfad/zum/modell.FCStd          # Blender-Render nach $CAD_OUT
+   python3 bench/run_bench.py --quick     # regression/timing, expected: all PASS
+   cad look path/to/model.FCStd           # Blender render into $CAD_OUT
    ```
 
-## Konfiguration
-| Variable | Bedeutung | Standard im Code |
+## Configuration
+| Variable | Meaning | Default in code |
 |---|---|---|
-| `CAD_DIR` | Ort dieses Repos | Verzeichnis des Skripts bzw. `/mnt/raid1/3d_print/tools/freecad` (Worker) |
-| `CAD_PROJEKT_ROOT` | Wurzel der Projektordner | `/mnt/raid1/3d_print` |
-| `CAD_OUT` | Ausgabe ohne aktives Projekt | `/mnt/raid1/3d_print/cad_out` |
-| `CAD_STATE` | Zustandsdatei des aktiven Projekts (pro Sitzung setzbar) | `<CAD_DIR>/.projekt_state.json` |
-| `CAD_BLENDER` | Blender-Programm | `blender` im `PATH` |
-| `CAD_SYMLINK_HOST` | ssh-Ziel (`user@host`), um Symlinks auf einer Netzfreigabe ohne Symlink-Unterstützung anzulegen | leer (aus) |
-| `CAD_REMOTE_PATH_MAP` | `<lokaler Präfix>=<Präfix auf dem Server>` für diese ssh-Befehle | leer |
-| `CAD_NO_OUTPUT_DIR` | Ordner, in den `cad` nie Bilder schreibt (z. B. ein Notizen-Vault) | leer |
-| `CAD_CONFIG` | Pfad der Konfigurationsdatei | `~/.config/cad/env` |
-| `CAD_IDLE_S`, `CAD_REQ_TIMEOUT` | Leerlauf bis Worker-Stopp (900 s), Anfrage-Timeout (5 s) | |
-| `CAD_RENDER_THREADS`, `CAD_RENDER_SLOTS`, `CAD_TMP` | Blender-Threads (4), parallele Renderjobs (3), Temp-Ordner | |
+| `CAD_DIR` | location of this repo | directory of the script, or `/mnt/raid1/3d_print/tools/freecad` (worker) |
+| `CAD_PROJEKT_ROOT` | root of the project folders | `/mnt/raid1/3d_print` |
+| `CAD_OUT` | output when no project is active | `/mnt/raid1/3d_print/cad_out` |
+| `CAD_STATE` | state file of the active project (can be set per session) | `<CAD_DIR>/.projekt_state.json` |
+| `CAD_BLENDER` | Blender executable | `blender` on `PATH` |
+| `CAD_SYMLINK_HOST` | ssh target (`user@host`) used to create symlinks on a network share without symlink support | empty (off) |
+| `CAD_REMOTE_PATH_MAP` | `<local prefix>=<prefix on the server>` for those ssh commands | empty |
+| `CAD_NO_OUTPUT_DIR` | folder `cad` never writes images into (e.g. a notes vault) | empty |
+| `CAD_CONFIG` | path of the config file | `~/.config/cad/env` |
+| `CAD_IDLE_S`, `CAD_REQ_TIMEOUT` | idle time until the worker stops (900 s), request timeout (5 s) | |
+| `CAD_RENDER_THREADS`, `CAD_RENDER_SLOTS`, `CAD_TMP` | Blender threads (4), parallel render jobs (3), temp folder | |
 
-Hinweis: Einige Standardwerte im Code zeigen noch auf das Layout des Autors (`/mnt/raid1/3d_print/…` als Projektwurzel); sie lassen sich mit den Variablen oben überschreiben. Die Beispielmodelle `gridfinity_*.py` und `cad_selftest.py` nennen Pfade des Autors und müssen bei fremder Ablage angepasst werden.
+Some defaults in the code still point to the author's layout (`/mnt/raid1/3d_print/…` as project root); override them with the variables above. The example models `gridfinity_*.py`, `plant_pot/` and `cad_selftest.py` reference the author's paths and need adjusting if the repo lives elsewhere.
 
-## Projektstruktur (`cad projekt`, `cad version`)
+## Project layout (`cad projekt`, `cad version`)
 ```
-<CAD_PROJEKT_ROOT>/<projekt>/
+<CAD_PROJEKT_ROOT>/<project>/
   PROJEKT.md  CHANGELOG.md
-  aktuell -> vNNN_<datum>_<label>
-  vNNN_<datum>_<label>/{modell,slice,vorschau,messung}/   eine Version = ein Stand
-  experimente/  _archiv/
+  aktuell -> vNNN_<date>_<label>                            "aktuell" = current version
+  vNNN_<date>_<label>/{modell,slice,vorschau,messung}/      model, slice, preview, measurement; one version = one state
+  experimente/  _archiv/                                     experiments, archive
 ```
-`cad version "Label"` legt die nächste Version an; `cad look`, `--report` und `--glb` schreiben automatisch in die aktive Version (`cad.outdir("modell")` im Skript). `cad freigabe "Notiz"` sperrt eine Version gegen weiteres Schreiben.
+`cad version "Label"` creates the next version; `cad look`, `--report` and `--glb` write into the active version automatically (`cad.outdir("modell")` inside a script). `cad freigabe "note"` releases a version and locks it against further writes.
 
-## Aufbau des Repos
-| Pfad | Inhalt |
+## Repository contents
+| Path | Contents |
 |---|---|
-| `cad`, `cadrun` | Client (CLI) |
-| `cad_worker.py` | Worker im FreeCAD (Unix-Socket) |
-| `cadlib.py`, `cadgeom.py`, `linienwand.py` | Skript-API (`cad.report`, `cad.focus`, `cad.material`, `cad.outdir`), Geometrie/Hotspots, Gap-Fill-Rechner |
-| `cad_render.py`, `cad_schoen.py` | Blender-Renderer (technisch / schön, GLB) |
-| `cadprojekt.py` | Projektstruktur |
-| `materials.json` | eigene Materialien für den Schön-Stil (`cad materials …`) |
-| `gridfinity_*.py` | Beispielmodelle (Gridfinity-Behälter) |
-| `plant_pot/` | Square Pot (Topf + Reservoir + Dochtkorb): Modell `plant_pot.py` mit Sicherheitsregeln, Prüfskripte (Drehweg, Gießstellung, Spiel, Absetzen) |
-| `stl_facetten.py` | Prüfung: sichtbare Facetten in STLs (zu grobe Vernetzung von Rundungen), CLI und Funktion, ohne numpy |
-| `gcode_schichten.py` | Analyse: Schichtzeit, Außenwand-Vorschub, Lüfter und Bahnarten je Schicht, markiert Zeitsprünge |
-| `bench/`, `cad_selftest.py` | Regression, Zeitmessung, Referenzen |
-| `research/` | Recherche-Notizen (CLI statt MCP, Snap-Fit) |
-| `cadconf.py`, `cad.env.example` | Konfigurationsdatei `~/.config/cad/env` |
-| `skill/SKILL.md` | Skill für Claude Code |
-| `systemd/cadworker.service` | Beispiel-Unit für den Worker |
+| `cad`, `cadrun` | client (CLI) |
+| `cad_worker.py` | worker running inside FreeCAD (Unix socket) |
+| `cadlib.py`, `cadgeom.py`, `linienwand.py` | script API (`cad.report`, `cad.focus`, `cad.material`, `cad.outdir`), geometry/hotspots, gap-fill calculator for line widths |
+| `cad_render.py`, `cad_schoen.py` | Blender renderers (technical / pretty, GLB) |
+| `cadprojekt.py` | project structure |
+| `materials.json` | custom materials for the pretty style (`cad materials …`) |
+| `gridfinity_*.py` | example models (Gridfinity bins) |
+| `plant_pot/` | square self-watering pot (pot + water reservoir + wick basket): fully parametric model `plant_pot.py` with built-in safety checks, plus check scripts (twist travel, pour position, clearance, seating) |
+| `stl_facetten.py` | check for visible facets in STLs (curves meshed too coarsely); CLI and function, no numpy |
+| `gcode_schichten.py` | G-code analysis per layer: layer time, outer-wall feed rate, fan and path types; flags time jumps |
+| `bench/`, `cad_selftest.py` | regression, timing, references |
+| `research/` | research notes (CLI instead of MCP, snap fits) |
+| `cadconf.py`, `cad.env.example` | config file `~/.config/cad/env` |
+| `skill/SKILL.md` | skill for Claude Code |
+| `systemd/cadworker.service` | example unit for the worker |
 
-## Entwickeln
-- Nicht im Repo (`.gitignore`): `*.bak-*`, `__pycache__`, Logs, `.projekt_state.json`, `*.FCBak`. Modelle, Bilder und Slices gehören in die Projektordner, nicht hierher.
-- Vor Änderungen am Renderer oder an der Geometrie `python3 bench/run_bench.py` laufen lassen (erwartet: alle PASS).
+### Example: parametric plant pot
+Every parameter of `plant_pot/plant_pot.py` can be overridden from outside without editing the file:
+```
+cad run -c 'SIZE_X=150; HEIGHT=120; exec(open("/path/to/freecad-cli/plant_pot/plant_pot.py").read())'
+```
 
-## Lizenz
-MIT, siehe [LICENSE](LICENSE).
+## Development
+- Not in the repo (`.gitignore`): `*.bak-*`, `__pycache__`, logs, `.projekt_state.json`, `*.FCBak`. Models, images and slices belong in project folders, not here.
+- Before changing the renderer or geometry code, run `python3 bench/run_bench.py` (expected: all PASS).
+
+## License
+MIT, see [LICENSE](LICENSE).
