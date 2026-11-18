@@ -43,7 +43,7 @@ TOPF_RING_W = P("TOPF_RING_W", 8.0)  # Joe 17.11. (Linie außen auf Höhe Topfbo
 GROOVE_TOP = P("GROOVE_TOP", 0.4) # Luft über der Lippe in der Nut
 SEAM_CH    = P("SEAM_CH", 0.0)    # Fase an beiden Fugenkanten außen (Joe 14.11.: keine Fase, Kante scharf -> Elefantenfuß im Slicer kompensieren)
 # Schnurkanal (Aufhängung) je Ecke: Torus, senkrechte Achse, in x gestreckt
-OESEN      = P("OESEN", True)     # Joe 17.11.: zwei Modelle im Shop, mit Ösen (Aufhängung) und ohne; False = Reservoir ohne Schnurkanäle
+OESEN      = P("OESEN", False)    # Joe 18.11.: Standard aus. Joe 17.11.: zwei Modelle im Shop, mit Ösen (Aufhängung) und ohne; False = Reservoir ohne Schnurkanäle
 CORD_INSET = P("CORD_INSET", 5.05)  # Mitte so weit innerhalb der Außenkante (x und y)
 CORD_R     = P("CORD_R", 4.0)     # Ringradius
 CORD_SX    = P("CORD_SX", 1.3)    # Streckung in x
@@ -728,7 +728,7 @@ if out:
     if BODEN_PROBE:
         _sl = slab(-1, POT_FLOOR + BODEN_PROBE)
         stl(_pb.common(_sl).removeSplitter(), "probe_boden_%s.stl" % NAME, [r_.common(_sl) for r_ in _pr])
-    stl(reservoir, ("reservoir_%s.stl" if OESEN else "reservoir_ohne_oesen_%s.stl") % NAME, rib_res if ribs is not None else ())
+    stl(reservoir, ("reservoir_mit_oesen_%s.stl" if OESEN else "reservoir_%s.stl") % NAME, rib_res if ribs is not None else ())
     if basket is not None:
         stl(basket, "dochtkorb_%s.stl" % NAME, lin=min(STL_LIN, 0.003))   # langer Konus (180er, WICK_GAP 0,5): bei 0,005 Knickkanten 3,3°
     if TEST:
