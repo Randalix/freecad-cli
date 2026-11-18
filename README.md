@@ -101,8 +101,9 @@ Some defaults in the code still point to the author's layout (`/mnt/raid1/3d_pri
 ### Example: parametric plant pot
 Every parameter of `plant_pot/plant_pot.py` can be overridden from outside without editing the file:
 ```
-cad run -c 'SIZE_X=150; HEIGHT=120; exec(open("/path/to/freecad-cli/plant_pot/plant_pot.py").read())'
+cad run -c 'SIZE_X=150; HEIGHT=120; exec(open("/path/to/freecad-cli/plant_pot/plant_pot.py").read())' --report
 ```
+This takes about 30 s and prints volumes, water capacity and the results of the built-in checks. It writes STLs (pot, reservoir, wick basket, test rings, named after the size, e.g. `pot_150x150x120.stl`) and a slicer JSON into the `modell/` folder of the active project version, or into `$CAD_OUT` when no project is active. With `--report`, a run via `-c` also writes `messung/report_code.json`.
 
 ## Development
 - Not in the repo (`.gitignore`): `*.bak-*`, `__pycache__`, logs, `.projekt_state.json`, `*.FCBak`. Models, images and slices belong in project folders, not here.
